@@ -258,3 +258,116 @@ def test_cleanup_removes_empty_dir_after_last_node():
         cleanup_stale_nodes(cfg, "myapp", graph)
 
         assert not fn_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# memory_save_chat
+# ---------------------------------------------------------------------------
+
+def test_save_chat_creates_file():
+    from server.ai_importer import save_chat_memory
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        cfg = _make_config(vault)
+        result = save_chat_memory(
+            cfg,
+            title="Test Session",
+            summary="We tested the save_chat pipeline end to end.",
+            key_facts=["Vault creates chats/ dir", "file uses frontmatter"],
+            decisions=["Use fixed chat_id in tests"],
+            tags=["testing", "synapse"],
+            chat_id="test-fixed-id",
+        )
+        chat_file = vault / "chats" / "test-fixed-id.md"
+        assert chat_file.exists(), "chat file not written to vault/chats/"
+        text = chat_file.read_text(encoding="utf-8")
+        assert "key: chats.test-fixed-id" in text
+        assert "Test Session" in text
+        assert result.get("key") == "chats.test-fixed-id"
+
+
+def test_save_chat_autogenerates_id():
+    from server.ai_importer import save_chat_memory
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        cfg = _make_config(vault)
+        result = save_chat_memory(
+            cfg,
+            title="Auto ID Test",
+            summary="No chat_id passed.",
+            key_facts=["id is auto-generated"],
+            decisions=[],
+            tags=["test"],
+        )
+        cid = result.get("key", "").replace("chats.", "")
+        assert cid and len(cid) > 4
+        assert (vault / "chats" / f"{cid}.md").exists()
+
+
+def test_save_chat_includes_key_facts():
+    from server.ai_importer import save_chat_memory
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        cfg = _make_config(vault)
+        save_chat_memory(
+            cfg,
+            title="Facts Test",
+            summary="Checking key facts appear in file body.",
+            key_facts=["fact one", "fact two"],
+            decisions=["decision alpha"],
+            tags=["test"],
+            chat_id="facts-test",
+        )
+        text = (vault / "chats" / "facts-test.md").read_text(encoding="utf-8")
+        assert "fact one" in text
+        assert "decision alpha" in text
+
+
+# ---------------------------------------------------------------------------
+# memory_code_search — no-index error path (no LLM, no vault writes needed)
+# ---------------------------------------------------------------------------
+
+def test_code_search_returns_error_without_index():
+    from server.functions import memory_code_search
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        cfg = _make_config(vault)
+        result = memory_code_search(cfg, "some query")
+        assert len(result) == 1
+        assert "error" in result[0]
+        assert "memory_scan_project" in result[0]["error"]
+
+
+# ---------------------------------------------------------------------------
+# memory_deep_search — no-graph error path (no LLM, no vault writes needed)
+# ---------------------------------------------------------------------------
+
+def test_deep_search_returns_error_without_graph():
+    from server.functions import memory_deep_search
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        (vault / "metadata").mkdir(parents=True)
+        cfg = _make_config(vault)
+        result = memory_deep_search(cfg, "some query")
+        assert len(result) == 1
+        assert "error" in result[0]
+        assert "topic_graph.json" in result[0]["error"]
+
+
+def test_deep_search_returns_results_with_graph():
+    from server.functions import memory_deep_search
+    import json as _json
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        meta = vault / "metadata"
+        meta.mkdir(parents=True)
+        chats = vault / "chats"
+        chats.mkdir()
+        # Minimal graph
+        graph = {"nodes": [{"id": "n1"}], "edges": []}
+        (meta / "topic_graph.json").write_text(_json.dumps(graph), encoding="utf-8")
+        # No FTS index → returns empty list, not an error dict
+        cfg = _make_config(vault)
+        result = memory_deep_search(cfg, "missing query")
+        assert isinstance(result, list)
