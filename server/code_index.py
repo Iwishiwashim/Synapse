@@ -3,6 +3,7 @@ SQLite-backed code graph index with FTS5 + semantic search.
 Separate from the memory vault index (_index.db).
 Stored at vault/_code_index.db.
 """
+
 from __future__ import annotations
 
 import math
@@ -56,6 +57,7 @@ CREATE TABLE IF NOT EXISTS code_embeddings (
 # Connection
 # ---------------------------------------------------------------------------
 
+
 def _db_path(vault_path: Path) -> Path:
     return vault_path / "_code_index.db"
 
@@ -70,6 +72,7 @@ def connect(vault_path: Path) -> sqlite3.Connection:
 # ---------------------------------------------------------------------------
 # Write helpers
 # ---------------------------------------------------------------------------
+
 
 def upsert_node(conn: sqlite3.Connection, node: dict[str, Any]) -> None:
     nk = node["node_key"]
@@ -103,7 +106,9 @@ def upsert_node(conn: sqlite3.Connection, node: dict[str, Any]) -> None:
     )
 
 
-def upsert_edge(conn: sqlite3.Connection, project: str, source: str, target: str, relation: str) -> None:
+def upsert_edge(
+    conn: sqlite3.Connection, project: str, source: str, target: str, relation: str
+) -> None:
     conn.execute(
         "INSERT OR IGNORE INTO code_edges(project, source, target, relation) VALUES (?,?,?,?)",
         (project, source, target, relation),
@@ -111,7 +116,12 @@ def upsert_edge(conn: sqlite3.Connection, project: str, source: str, target: str
 
 
 def delete_project(conn: sqlite3.Connection, project: str) -> None:
-    keys = [r[0] for r in conn.execute("SELECT node_key FROM code_nodes WHERE project=?", (project,)).fetchall()]
+    keys = [
+        r[0]
+        for r in conn.execute(
+            "SELECT node_key FROM code_nodes WHERE project=?", (project,)
+        ).fetchall()
+    ]
     for k in keys:
         conn.execute("DELETE FROM code_fts WHERE node_key=?", (k,))
     conn.execute("DELETE FROM code_nodes WHERE project=?", (project,))
@@ -122,6 +132,7 @@ def delete_project(conn: sqlite3.Connection, project: str) -> None:
 # ---------------------------------------------------------------------------
 # Bulk index
 # ---------------------------------------------------------------------------
+
 
 def index_project(
     vault_path: Path,
@@ -160,7 +171,9 @@ def index_project(
             upsert_edge(conn, project, edge["source"], edge["target"], edge["relation"])
 
         conn.commit()
-        count = conn.execute("SELECT COUNT(*) FROM code_nodes WHERE project=?", (project,)).fetchone()[0]
+        count = conn.execute(
+            "SELECT COUNT(*) FROM code_nodes WHERE project=?", (project,)
+        ).fetchone()[0]
 
     # Embed descriptions (outside transaction to avoid long locks)
     if api_key:
@@ -225,6 +238,7 @@ def _upsert_embedding(db_path: Path, node_key: str, vector: list[float]) -> None
 # Search
 # ---------------------------------------------------------------------------
 
+
 def search_code(
     vault_path: Path,
     api_key: str | None,
@@ -237,7 +251,9 @@ def search_code(
     Returns list of node dicts with score and call edges.
     """
     fts_results = _fts_search(vault_path, query, project, limit * 2)
-    sem_results = _semantic_search(vault_path, api_key, query, project, limit * 2) if api_key else []
+    sem_results = (
+        _semantic_search(vault_path, api_key, query, project, limit * 2) if api_key else []
+    )
     merged = _hybrid_merge(fts_results, sem_results, limit)
     return _enrich(vault_path, merged, project)
 
@@ -284,6 +300,7 @@ def _semantic_search(
     try:
         from google import genai
         from google.genai import types as gtypes
+
         client = genai.Client(api_key=api_key)
         result = client.models.embed_content(
             model="gemini-embedding-001",
@@ -301,8 +318,8 @@ def _semantic_search(
     conn = sqlite3.connect(db, timeout=30)
     try:
         rows = conn.execute(
-            "SELECT node_key, vector FROM code_embeddings" +
-            (" WHERE node_key LIKE ?" if project else ""),
+            "SELECT node_key, vector FROM code_embeddings"
+            + (" WHERE node_key LIKE ?" if project else ""),
             ([f"{project}/%"] if project else []),
         ).fetchall()
     finally:
@@ -315,8 +332,10 @@ def _semantic_search(
         scored.append({"node_key": row[0], "score": round(sim, 4)})
 
     scored.sort(key=lambda x: -x["score"])
-    return [{"node_key": r["node_key"], "score": r["score"], "search": "semantic"}
-            for r in scored[:limit]]
+    return [
+        {"node_key": r["node_key"], "score": r["score"], "search": "semantic"}
+        for r in scored[:limit]
+    ]
 
 
 def _hybrid_merge(
@@ -331,15 +350,21 @@ def _hybrid_merge(
     for r in fts:
         key = r["node_key"]
         sem_s = sem_map.get(key, 0.0)
-        merged[key] = {**r, "score": round(r["score"] * 0.45 + sem_s * 0.55, 4),
-                       "search": "hybrid" if key in sem_map else "fts5"}
+        merged[key] = {
+            **r,
+            "score": round(r["score"] * 0.45 + sem_s * 0.55, 4),
+            "search": "hybrid" if key in sem_map else "fts5",
+        }
 
     for r in sem:
         key = r["node_key"]
         if key not in merged:
             fts_s = fts_map[key]["score"] if key in fts_map else 0.0
-            merged[key] = {"node_key": key, "score": round(fts_s * 0.45 + r["score"] * 0.55, 4),
-                           "search": "semantic"}
+            merged[key] = {
+                "node_key": key,
+                "score": round(fts_s * 0.45 + r["score"] * 0.55, 4),
+                "search": "semantic",
+            }
 
     return sorted(merged.values(), key=lambda x: -x["score"])[:limit]
 
@@ -366,13 +391,15 @@ def _enrich(vault_path: Path, results: list[dict[str, Any]], project: str) -> li
                 "SELECT target FROM code_edges WHERE project=? AND source=? AND relation='calls'",
                 (proj, nid),
             ).fetchall()
-            node.update({
-                "score": r["score"],
-                "search": r.get("search", "fts5"),
-                "callers": callers,
-                "callees": [c[0] for c in callees],
-                "source": node.get("source", "")[:500],  # trim for response
-            })
+            node.update(
+                {
+                    "score": r["score"],
+                    "search": r.get("search", "fts5"),
+                    "callers": callers,
+                    "callees": [c[0] for c in callees],
+                    "source": node.get("source", "")[:500],  # trim for response
+                }
+            )
             enriched.append(node)
     return enriched
 
@@ -409,18 +436,22 @@ def list_projects(vault_path: Path) -> list[str]:
 
 def project_stats(vault_path: Path, project: str) -> dict[str, Any]:
     with connect(vault_path) as conn:
-        total = conn.execute("SELECT COUNT(*) FROM code_nodes WHERE project=?", (project,)).fetchone()[0]
+        total = conn.execute(
+            "SELECT COUNT(*) FROM code_nodes WHERE project=?", (project,)
+        ).fetchone()[0]
         by_type = conn.execute(
             "SELECT type, COUNT(*) FROM code_nodes WHERE project=? GROUP BY type", (project,)
         ).fetchall()
-        edges = conn.execute("SELECT COUNT(*) FROM code_edges WHERE project=?", (project,)).fetchone()[0]
-    return {"total_nodes": total, "edges": edges,
-            "by_type": {r[0]: r[1] for r in by_type}}
+        edges = conn.execute(
+            "SELECT COUNT(*) FROM code_edges WHERE project=?", (project,)
+        ).fetchone()[0]
+    return {"total_nodes": total, "edges": edges, "by_type": {r[0]: r[1] for r in by_type}}
 
 
 # ---------------------------------------------------------------------------
 # Cosine similarity
 # ---------------------------------------------------------------------------
+
 
 def _cosine(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))

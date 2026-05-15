@@ -5,6 +5,7 @@ Two background threads per watched project:
   _observe  — polls filesystem for mtime changes, debounces into a queue
   _worker   - drains queue, calls the configured inference provider, auto-applies patches
 """
+
 from __future__ import annotations
 
 import re
@@ -18,9 +19,20 @@ if TYPE_CHECKING:
 
 WATCH_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".cjs", ".mjs"}
 SKIP_DIRS = {
-    "node_modules", "__pycache__", ".venv", "venv", ".git",
-    "dist", "build", ".next", "out", "release", "desktop-artifacts",
-    ".turbo", ".cache", "coverage",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".git",
+    "dist",
+    "build",
+    ".next",
+    "out",
+    "release",
+    "desktop-artifacts",
+    ".turbo",
+    ".cache",
+    "coverage",
 }
 DEBOUNCE_S = 4.0
 POLL_S = 2.0
@@ -31,7 +43,7 @@ class _WatchState:
         self.config = config
         self.root = root
         self.project_name = root.name
-        self.pending: dict[str, float] = {}   # rel_path -> process-after timestamp
+        self.pending: dict[str, float] = {}  # rel_path -> process-after timestamp
         self.lock = threading.Lock()
         self.stop = threading.Event()
         self.processed = 0
@@ -47,6 +59,7 @@ _active_lock = threading.Lock()
 # ---------------------------------------------------------------------------
 # Public API (called from functions.py)
 # ---------------------------------------------------------------------------
+
 
 def start_watcher(config: "SynapseConfig", path_str: str) -> dict[str, Any]:
     global _active
@@ -64,8 +77,10 @@ def start_watcher(config: "SynapseConfig", path_str: str) -> dict[str, Any]:
         state = _WatchState(config, root)
         _active = state
 
-        threading.Thread(target=_observe, args=(state,), daemon=True, name="synapse-observe").start()
-        threading.Thread(target=_worker,  args=(state,), daemon=True, name="synapse-worker").start()
+        threading.Thread(
+            target=_observe, args=(state,), daemon=True, name="synapse-observe"
+        ).start()
+        threading.Thread(target=_worker, args=(state,), daemon=True, name="synapse-worker").start()
 
         return {"status": "started", "path": str(root), "project": root.name}
 
@@ -107,6 +122,7 @@ def watcher_status() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Background threads
 # ---------------------------------------------------------------------------
+
 
 def _observe(state: _WatchState) -> None:
     """Poll project tree for mtime changes and enqueue modified files."""
@@ -187,9 +203,7 @@ def _worker(state: _WatchState) -> None:
                 continue
             try:
                 content = full_path.read_text(encoding="utf-8", errors="ignore")[:12000]
-                patch = _ai_extract_file_fast(
-                    state.config, state.project_name, rel_path, content
-                )
+                patch = _ai_extract_file_fast(state.config, state.project_name, rel_path, content)
                 if patch:
                     result = propose_update(state.config, patch)
                     apply_update(state.config, result["patch_id"])

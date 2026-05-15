@@ -8,10 +8,9 @@ from .config import SynapseConfig
 from .encryption import read_text
 from .memory_file import parse_memory_text, path_to_key
 
-
 _MIN_CONTENT_CHARS = 40  # files shorter than this are flagged as thin/empty
-_TRIGGER_DUP_THRESHOLD = 0.55   # Jaccard on triggers
-_CONTENT_DUP_THRESHOLD = 0.42   # Jaccard on word sets
+_TRIGGER_DUP_THRESHOLD = 0.55  # Jaccard on triggers
+_CONTENT_DUP_THRESHOLD = 0.42  # Jaccard on word sets
 
 
 def _jaccard(a: set, b: set) -> float:
@@ -31,14 +30,16 @@ def _load_all(config: SynapseConfig) -> list[dict[str, Any]]:
             continue
         key = str(fm.get("key") or path_to_key(vault, md))
         triggers = set(str(t).lower() for t in (fm.get("triggers") or []))
-        entries.append({
-            "key": key,
-            "path": rel,
-            "triggers": triggers,
-            "content": content,
-            "content_len": len(content.strip()),
-            "type": fm.get("type", "note"),
-        })
+        entries.append(
+            {
+                "key": key,
+                "path": rel,
+                "triggers": triggers,
+                "content": content,
+                "content_len": len(content.strip()),
+                "type": fm.get("type", "note"),
+            }
+        )
     return entries
 
 
@@ -70,20 +71,31 @@ def memory_deduplicate(config: SynapseConfig, auto_clean: bool = False) -> dict[
         reason = None
         if parts[0] == "test":
             reason = "test/ folder — should not exist in vault"
-        elif e["path"].parent == Path(".") and e["path"].name.startswith("_") and e["path"].name not in {"_index.db", "_weekly.md", "_pending.json", "_rejections.jsonl"}:
+        elif (
+            e["path"].parent == Path(".")
+            and e["path"].name.startswith("_")
+            and e["path"].name
+            not in {"_index.db", "_weekly.md", "_pending.json", "_rejections.jsonl"}
+        ):
             reason = "orphaned root _ file"
         if reason:
             stray.append({"key": e["key"], "path": str(e["path"]), "reason": reason})
 
     # --- Thin files ---
     for e in entries:
-        if e["type"] != "index" and e["content_len"] < _MIN_CONTENT_CHARS and not e["key"].startswith("chats."):
-            thin.append({
-                "key": e["key"],
-                "path": str(e["path"]),
-                "content_len": e["content_len"],
-                "hint": "likely a stub — consider merging into a richer entry",
-            })
+        if (
+            e["type"] != "index"
+            and e["content_len"] < _MIN_CONTENT_CHARS
+            and not e["key"].startswith("chats.")
+        ):
+            thin.append(
+                {
+                    "key": e["key"],
+                    "path": str(e["path"]),
+                    "content_len": e["content_len"],
+                    "hint": "likely a stub — consider merging into a richer entry",
+                }
+            )
 
     # --- Duplicate detection within same top-level category ---
     by_cat: dict[str, list] = {}
@@ -98,7 +110,7 @@ def memory_deduplicate(config: SynapseConfig, auto_clean: bool = False) -> dict[
             group = [e for e in group if len(e["key"].split(".")) <= 3]
 
         for i, a in enumerate(group):
-            for b in group[i + 1:]:
+            for b in group[i + 1 :]:
                 pair = frozenset([a["key"], b["key"]])
                 if pair in seen_pairs:
                     continue
@@ -114,12 +126,14 @@ def memory_deduplicate(config: SynapseConfig, auto_clean: bool = False) -> dict[
 
                 if content_j >= _CONTENT_DUP_THRESHOLD or trigger_j >= 0.75:
                     keep = a["key"] if len(a["key"]) <= len(b["key"]) else b["key"]
-                    duplicate_groups.append({
-                        "keys": [a["key"], b["key"]],
-                        "trigger_similarity": round(trigger_j, 2),
-                        "content_similarity": round(content_j, 2),
-                        "suggestion": f"merge into {keep}",
-                    })
+                    duplicate_groups.append(
+                        {
+                            "keys": [a["key"], b["key"]],
+                            "trigger_similarity": round(trigger_j, 2),
+                            "content_similarity": round(content_j, 2),
+                            "suggestion": f"merge into {keep}",
+                        }
+                    )
 
     # --- Auto-clean stray + thin ---
     if auto_clean:
@@ -145,6 +159,10 @@ def memory_deduplicate(config: SynapseConfig, auto_clean: bool = False) -> dict[
             "thin": len(thin),
             "duplicate_groups": len(duplicate_groups),
             "auto_deleted": len(deleted),
-            "action": "stray+thin deleted" if auto_clean else "report only — pass auto_clean=true to delete stray/thin automatically",
+            "action": (
+                "stray+thin deleted"
+                if auto_clean
+                else "report only — pass auto_clean=true to delete stray/thin automatically"
+            ),
         },
     }

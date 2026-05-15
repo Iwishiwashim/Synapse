@@ -1,5 +1,7 @@
 # Synapse
 
+[![CI](https://github.com/Santhosh-Stalin/Synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/Santhosh-Stalin/Synapse/actions/workflows/ci.yml)
+
 A memory agent for Claude that reduces token usage.
 
 Every Claude session starts from zero. Without Synapse, giving Claude context means pasting notes, history, and project details manually — burning thousands of tokens before any real work begins. Synapse stores that context as structured Markdown, retrieves only what's relevant, and keeps Claude's context window free for thinking.
@@ -31,7 +33,30 @@ The last row is the point. A chat archive of 1,997 conversations is 1.37M tokens
 
 ---
 
-## Quick start
+## Quickstart in 5 minutes
+
+```bash
+# 1. Clone and install
+git clone https://github.com/Santhosh-Stalin/Synapse.git
+cd Synapse
+python -m venv .venv && .venv\Scripts\activate   # Windows
+pip install -r requirements.txt
+
+# 2. Get a free Gemini API key at aistudio.google.com/apikey, then:
+python setup.py
+# → enter your key, accept defaults, choose write mode (review or auto)
+# → restarts Claude Desktop config automatically
+
+# 3. Restart Claude Desktop
+# Synapse appears in the tools list. Start a conversation and say:
+# "Load my memory context"
+```
+
+That's it. Claude now has access to your vault and will use `memory_auto` to retrieve context and `memory_commit` to save new memories.
+
+---
+
+## Full install
 
 ```bash
 # 1. Install

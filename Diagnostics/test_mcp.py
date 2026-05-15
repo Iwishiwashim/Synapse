@@ -6,6 +6,7 @@ Usage:
     python test_mcp.py              # tests non-AI tools only
     python test_mcp.py --full       # also calls memory.search (needs API key)
 """
+
 from __future__ import annotations
 
 import json
@@ -30,6 +31,7 @@ results: list[tuple[str, bool]] = []
 # ---------------------------------------------------------------------------
 # Minimal MCP client over stdio
 # ---------------------------------------------------------------------------
+
 
 class MCPClient:
     def __init__(self) -> None:
@@ -99,6 +101,7 @@ class MCPClient:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def check(name: str, ok: bool, detail: str = "") -> None:
     tag = PASS if ok else FAIL
     suffix = f" -- {detail}" if detail else ""
@@ -148,11 +151,14 @@ time.sleep(1.0)  # let the server start
 try:
     # ── 1. Handshake ────────────────────────────────────────
     section("1. Handshake (initialize)")
-    resp = client.request("initialize", {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {},
-        "clientInfo": {"name": "synapse-test", "version": "1.0"},
-    })
+    resp = client.request(
+        "initialize",
+        {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {"name": "synapse-test", "version": "1.0"},
+        },
+    )
     ok = "result" in resp
     server_name = resp.get("result", {}).get("serverInfo", {}).get("name", "")
     check("initialize succeeds", ok, server_name)
@@ -168,12 +174,22 @@ try:
         print(f"     - {t}")
 
     expected = [
-        "memory_tree", "memory_get", "memory_search",
-        "memory_propose_update", "memory_apply_update", "memory_reject_update",
-        "memory_diff", "memory_conflicts", "memory_rebuild_index",
-        "memory_relink_all", "memory_organize", "memory_scan_project",
-        "memory_weekly_report", "memory_start_watcher",
-        "memory_stop_watcher", "memory_watcher_status",
+        "memory_tree",
+        "memory_get",
+        "memory_search",
+        "memory_propose_update",
+        "memory_apply_update",
+        "memory_reject_update",
+        "memory_diff",
+        "memory_conflicts",
+        "memory_rebuild_index",
+        "memory_relink_all",
+        "memory_organize",
+        "memory_scan_project",
+        "memory_weekly_report",
+        "memory_start_watcher",
+        "memory_stop_watcher",
+        "memory_watcher_status",
     ]
     for name in expected:
         check(f"tool registered: {name}", name in tools)
@@ -208,17 +224,21 @@ try:
 
     # ── 7. memory.propose_update + apply + get ───────────────
     section("7. Write pipeline (propose -> apply -> get)")
-    proposed = tool_call(client, "memory_propose_update", {
-        "patch": {
-            "key": "test.mcp-probe",
-            "content": "MCP server probe entry. Safe to delete.",
-            "type": "note",
-            "scope": "global",
-            "weight": 0.1,
-            "signal": "high_signal",
-            "reason": "MCP server test",
-        }
-    })
+    proposed = tool_call(
+        client,
+        "memory_propose_update",
+        {
+            "patch": {
+                "key": "test.mcp-probe",
+                "content": "MCP server probe entry. Safe to delete.",
+                "type": "note",
+                "scope": "global",
+                "weight": 0.1,
+                "signal": "high_signal",
+                "reason": "MCP server test",
+            }
+        },
+    )
     patch_id = proposed.get("patch_id", "") if proposed else ""
     check("propose returns patch_id", bool(patch_id), patch_id)
 
@@ -230,17 +250,20 @@ try:
         check("get returns content", "probe" in (got.get("content", "") if got else ""))
 
         # Cleanup — propose overwrite then reject it so the file gets removed at end
-        client.request("tools/call", {
-            "name": "memory_propose_update",
-            "arguments": {
-                "patch": {
-                    "key": "test.mcp-probe",
-                    "content": "Deleted by MCP test cleanup.",
-                    "signal": "high_signal",
-                    "reason": "cleanup",
-                }
+        client.request(
+            "tools/call",
+            {
+                "name": "memory_propose_update",
+                "arguments": {
+                    "patch": {
+                        "key": "test.mcp-probe",
+                        "content": "Deleted by MCP test cleanup.",
+                        "signal": "high_signal",
+                        "reason": "cleanup",
+                    }
+                },
             },
-        })
+        )
 
     # ── 8. memory.search (optional, needs key) ───────────────
     if FULL:
@@ -262,9 +285,11 @@ try:
     # FastMCP logs INFO messages to stderr — that's expected.
     # Only flag actual errors/tracebacks.
     all_stderr = [l for l in client.stderr if l.strip()]
-    bad_stderr = [l for l in all_stderr if any(
-        marker in l for marker in ("ERROR", "Traceback", "Exception", "Error:")
-    )]
+    bad_stderr = [
+        l
+        for l in all_stderr
+        if any(marker in l for marker in ("ERROR", "Traceback", "Exception", "Error:"))
+    ]
     if all_stderr:
         print(f"     {len(all_stderr)} log line(s) (showing errors only):")
         for l in bad_stderr:

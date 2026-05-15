@@ -11,6 +11,7 @@ Output: a table showing Synapse tokens, baseline tokens, and reduction % per
 query tier, plus an aggregate. Writes results to Diagnostics/benchmark_results.json
 so you can track changes over time.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,10 +27,10 @@ sys.path.insert(0, str(ROOT))
 from server.config import load_config
 from server.functions import _estimate_tokens, memory_auto, memory_context
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _file_tokens(path: Path) -> int:
     try:
@@ -96,6 +97,7 @@ QUERIES = [
 # Runner
 # ---------------------------------------------------------------------------
 
+
 def run_benchmark(verbose: bool = True) -> dict[str, Any]:
     config = load_config()
     vault = config.vault_path
@@ -136,7 +138,9 @@ def run_benchmark(verbose: bool = True) -> dict[str, Any]:
             print(f"  memory_context error: {e}")
 
     if verbose and ctx_tokens:
-        reduction = (identity_baseline - ctx_tokens) / identity_baseline * 100 if identity_baseline else 0
+        reduction = (
+            (identity_baseline - ctx_tokens) / identity_baseline * 100 if identity_baseline else 0
+        )
         print(f"memory_context() alone:")
         print(f"  Synapse  : {ctx_tokens:,} tokens  ({ctx_ms} ms)")
         print(f"  Baseline : {identity_baseline:,} tokens  (raw identity/ folder)")
@@ -145,7 +149,9 @@ def run_benchmark(verbose: bool = True) -> dict[str, Any]:
 
     # ── Per-query table ─────────────────────────────────────────────────────
     if verbose:
-        print(f"  {'Query':<32} {'Tier':<6} {'Synapse':>8}  {'Baseline':>9}  {'Saving':>7}  {'ms':>5}")
+        print(
+            f"  {'Query':<32} {'Tier':<6} {'Synapse':>8}  {'Baseline':>9}  {'Saving':>7}  {'ms':>5}"
+        )
         print("  " + "-" * 66)
 
     rows: list[dict[str, Any]] = []

@@ -8,6 +8,7 @@ Run once after cloning:  python setup.py
   - Writes Claude Desktop MCP config  (optional)
   - Writes Claude Code user MCP config (optional)
 """
+
 from __future__ import annotations
 
 import json
@@ -27,6 +28,7 @@ _VAULT_FOLDERS = ["identity", "life", "work", "projects", "patterns", "chats", "
 # ---------------------------------------------------------------------------
 # .env helpers
 # ---------------------------------------------------------------------------
+
 
 def _read_env() -> dict[str, str]:
     if not ENV_FILE.exists():
@@ -49,6 +51,7 @@ def _write_env(env: dict[str, str]) -> None:
 # ---------------------------------------------------------------------------
 # config.yaml helpers
 # ---------------------------------------------------------------------------
+
 
 def _read_config() -> dict:
     if not CONFIG_FILE.exists():
@@ -92,6 +95,7 @@ def _write_config(cfg: dict) -> None:
 # Vault initialisation
 # ---------------------------------------------------------------------------
 
+
 def _init_vault(vault_path: Path) -> list[str]:
     """Create vault directory and standard sub-folders. Returns list of created paths."""
     created = []
@@ -110,6 +114,7 @@ def _init_vault(vault_path: Path) -> list[str]:
 # Claude Desktop config
 # ---------------------------------------------------------------------------
 
+
 def _desktop_config_path() -> Path | None:
     platform = sys.platform
     if platform == "win32":
@@ -119,7 +124,13 @@ def _desktop_config_path() -> Path | None:
             if packages.exists():
                 for entry in packages.iterdir():
                     if entry.name.startswith("Claude_"):
-                        candidate = entry / "LocalCache" / "Roaming" / "Claude" / "claude_desktop_config.json"
+                        candidate = (
+                            entry
+                            / "LocalCache"
+                            / "Roaming"
+                            / "Claude"
+                            / "claude_desktop_config.json"
+                        )
                         if candidate.parent.exists():
                             return candidate
         appdata = os.environ.get("APPDATA", "")
@@ -164,6 +175,7 @@ def _write_desktop_config(api_key: str) -> str:
 # Claude Code config  (~/.claude.json, user scope = available in all projects)
 # ---------------------------------------------------------------------------
 
+
 def _claude_code_config_path() -> Path:
     return Path.home() / ".claude.json"
 
@@ -197,6 +209,7 @@ def _write_claude_code_config(api_key: str) -> str:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def _ask(prompt: str, default: str = "") -> str:
     try:
@@ -266,7 +279,10 @@ def main() -> None:
     current_archive = str(cfg.get("raw_archive_path", "./synapse_extracted"))
     print("Raw archive path: folder where synapse_extracted/ conversations are stored.")
     print("Leave blank to disable raw archive features (memory_get_raw, memory_search_raw).")
-    archive_str = _ask(f"Raw archive path [{current_archive}] (Enter to keep, '-' to disable): ") or current_archive
+    archive_str = (
+        _ask(f"Raw archive path [{current_archive}] (Enter to keep, '-' to disable): ")
+        or current_archive
+    )
     if archive_str == "-":
         archive_str = ""
     cfg["raw_archive_path"] = archive_str
@@ -276,7 +292,9 @@ def main() -> None:
         if not archive_path.is_absolute():
             archive_path = (ROOT / archive_path).resolve()
         if not archive_path.exists():
-            print(f"  Note: {archive_path} does not exist yet — create it when you run memory_import_ai_export.")
+            print(
+                f"  Note: {archive_path} does not exist yet — create it when you run memory_import_ai_export."
+            )
         else:
             print(f"  Archive path: {archive_path}")
     else:
@@ -286,7 +304,9 @@ def main() -> None:
 
     # --- Write mode ---
     print("Memory write mode:")
-    print("  review — Claude proposes a diff you approve before anything is written (default, safer)")
+    print(
+        "  review — Claude proposes a diff you approve before anything is written (default, safer)"
+    )
     print("  auto   — Claude writes directly, no confirmation needed (faster)")
     current_mode = str(cfg.get("write_mode", "review"))
     mode_input = _ask(f"Write mode [{current_mode}] (Enter to keep): ") or current_mode

@@ -35,7 +35,11 @@ while True:
         eta = "?"
         rate_str = "?"
 
-    print(f"\r[{bar}] {count}/{TOTAL} ({pct*100:.1f}%) | {rate_str} | ETA: {eta} | Errors: {errors}   ", end="", flush=True)
+    print(
+        f"\r[{bar}] {count}/{TOTAL} ({pct*100:.1f}%) | {rate_str} | ETA: {eta} | Errors: {errors}   ",
+        end="",
+        flush=True,
+    )
 
     if count >= TOTAL:
         print("\nDone!")

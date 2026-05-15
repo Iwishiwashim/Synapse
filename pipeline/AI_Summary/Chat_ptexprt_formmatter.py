@@ -24,6 +24,7 @@ WRITE_JSONL = True
 # HELPERS
 # =========================
 
+
 def parse_timestamp(value):
     if value is None:
         return None
@@ -100,7 +101,9 @@ def load_conversations(export_path):
             conversations.append(data)
             count = 1
 
-        print(f"[{index}/{len(split_files)}] Finished {file_path.name} ({count} conversations loaded)")
+        print(
+            f"[{index}/{len(split_files)}] Finished {file_path.name} ({count} conversations loaded)"
+        )
 
     print(f"\nFinished loading all files. Total conversations: {len(conversations)}")
     return conversations
@@ -222,11 +225,7 @@ def extract_messages(conversation, file_index):
         content_type = content.get("content_type", "unknown")
 
         readable_parts = extract_readable_text(content)
-        readable_text = "\n".join(
-            str(part).strip()
-            for part in readable_parts
-            if str(part).strip()
-        )
+        readable_text = "\n".join(str(part).strip() for part in readable_parts if str(part).strip())
 
         if not readable_text:
             continue
@@ -240,10 +239,7 @@ def extract_messages(conversation, file_index):
 
             if resolved_path and resolved_path not in seen_paths:
                 seen_paths.add(resolved_path)
-                files.append({
-                    "original_reference": ref,
-                    "path": resolved_path
-                })
+                files.append({"original_reference": ref, "path": resolved_path})
 
         record = {
             "node_id": node_id,
@@ -252,7 +248,7 @@ def extract_messages(conversation, file_index):
             "role": get_role(message),
             "content_type": content_type,
             "content": readable_text,
-            "files": files
+            "files": files,
         }
 
         messages.append(record)
@@ -315,8 +311,8 @@ def write_markdown_note(convo_record, clean_text, md_root):
         f.write(f'created: "{convo_record["created"]}"\n')
         f.write(f'updated: "{convo_record["updated"]}"\n')
         f.write(f'message_count: {len(convo_record["messages"])}\n')
-        f.write(f'clean_chars: {len(clean_text)}\n')
-        f.write(f'estimated_tokens: {estimate_tokens(clean_text)}\n')
+        f.write(f"clean_chars: {len(clean_text)}\n")
+        f.write(f"estimated_tokens: {estimate_tokens(clean_text)}\n")
         f.write("source: chatgpt_export\n")
         f.write("tags:\n")
         f.write("  - synapse\n")
@@ -383,7 +379,7 @@ def main():
             "created_sort": created_dt.timestamp() if created_dt else 0,
             "updated_sort": updated_dt.timestamp() if updated_dt else 0,
             "created_dt": created_dt,
-            "messages": messages
+            "messages": messages,
         }
 
         clean_text = build_clean_conversation_text(convo_record)
@@ -399,27 +395,31 @@ def main():
             "clean_chars": len(clean_text),
             "estimated_tokens": estimate_tokens(clean_text),
             "clean_text": clean_text,
-            "messages": messages
+            "messages": messages,
         }
 
         md_path = None
         if WRITE_MARKDOWN:
-            md_path = write_markdown_note(convo_output_record | {"created_dt": created_dt}, clean_text, md_folder)
+            md_path = write_markdown_note(
+                convo_output_record | {"created_dt": created_dt}, clean_text, md_folder
+            )
 
         month = month_key(created_dt)
         monthly_records[month].append(convo_output_record)
 
-        index_records.append({
-            "conversation_id": conversation_id,
-            "title": title,
-            "created": format_time(created_dt),
-            "updated": format_time(updated_dt),
-            "month": month,
-            "message_count": len(messages),
-            "clean_chars": len(clean_text),
-            "estimated_tokens": estimate_tokens(clean_text),
-            "markdown_path": md_path
-        })
+        index_records.append(
+            {
+                "conversation_id": conversation_id,
+                "title": title,
+                "created": format_time(created_dt),
+                "updated": format_time(updated_dt),
+                "month": month,
+                "message_count": len(messages),
+                "clean_chars": len(clean_text),
+                "estimated_tokens": estimate_tokens(clean_text),
+                "markdown_path": md_path,
+            }
+        )
 
     print("\nFinished extracting.")
     print(f"Conversations extracted: {len(index_records)}")

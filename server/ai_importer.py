@@ -5,6 +5,7 @@ Handles: Claude.ai, ChatGPT (and generic plain-text memory files).
 Holistically different from scanner.py: no AST, no code graph, no function proposals.
 Goal: reconstruct a rich personal knowledge dossier from conversation history and stored memories.
 """
+
 from __future__ import annotations
 
 import json
@@ -22,6 +23,7 @@ _GEMMA_MODEL = "gemma-4-31b-it"
 
 
 # ─── Gemma (Gemini API) completion ─────────────────────────────────────────────
+
 
 def _gemma_complete(config: "SynapseConfig", system: str, user: str) -> str:
     """Call Gemma via the Gemini API. Returns raw text or empty string on failure."""
@@ -49,7 +51,10 @@ def _gemma_complete(config: "SynapseConfig", system: str, user: str) -> str:
 
 # ─── Blacklist loader ───────────────────────────────────────────────────────────
 
-def _load_blacklist(blacklist_path: Path | None = None, redflag_path: Path | None = None) -> set[str]:
+
+def _load_blacklist(
+    blacklist_path: Path | None = None, redflag_path: Path | None = None
+) -> set[str]:
     """Load conversation IDs to skip from blacklist and/or redflag files."""
     ids: set[str] = set()
     for path in [blacklist_path, redflag_path]:
@@ -64,6 +69,7 @@ def _load_blacklist(blacklist_path: Path | None = None, redflag_path: Path | Non
             if cid:
                 ids.add(cid)
     return ids
+
 
 # ─── System prompt ─────────────────────────────────────────────────────────────
 
@@ -138,6 +144,7 @@ Output raw JSON array only. Start with [ and end with ].\
 
 # ─── Provider detection ────────────────────────────────────────────────────────
 
+
 def _detect_provider(root: Path) -> str:
     """Return 'claude', 'chatgpt', 'plaintext', or 'unknown'."""
     files = {f.name for f in root.iterdir() if f.is_file()} if root.is_dir() else set()
@@ -154,7 +161,9 @@ def _detect_provider(root: Path) -> str:
     if "conversations.json" in files and "user.json" in files:
         return "chatgpt"
     # ChatGPT split export: conversations-000.json, conversations-001.json, ... + user.json
-    if "user.json" in files and any(f.startswith("conversations-") and f.endswith(".json") for f in files):
+    if "user.json" in files and any(
+        f.startswith("conversations-") and f.endswith(".json") for f in files
+    ):
         return "chatgpt"
     # Folder of plain text / markdown files
     if any(f.endswith((".txt", ".md")) for f in files):
@@ -163,6 +172,7 @@ def _detect_provider(root: Path) -> str:
 
 
 # ─── Provider-specific preprocessors ──────────────────────────────────────────
+
 
 def _preprocess_claude(root: Path) -> dict[str, str]:
     """
@@ -180,8 +190,7 @@ def _preprocess_claude(root: Path) -> dict[str, str]:
             if blob:
                 chunks["[Claude memories blob]"] = (
                     "These are the memories Claude.ai has stored about this user.\n"
-                    "This is the highest-signal data — extract every specific detail.\n\n"
-                    + blob
+                    "This is the highest-signal data — extract every specific detail.\n\n" + blob
                 )
         except Exception:
             pass
@@ -193,8 +202,7 @@ def _preprocess_claude(root: Path) -> dict[str, str]:
             data = json.loads(users_path.read_text(encoding="utf-8", errors="ignore"))
             if data:
                 chunks["[Claude user profile]"] = (
-                    "User account data from Claude.ai:\n"
-                    + json.dumps(data[0], indent=2)
+                    "User account data from Claude.ai:\n" + json.dumps(data[0], indent=2)
                 )
         except Exception:
             pass
@@ -233,8 +241,7 @@ def _preprocess_claude(root: Path) -> dict[str, str]:
                 batch = summaries[i : i + batch_size]
                 label = f"[Claude conversation summaries {i + 1}–{i + len(batch)}]"
                 chunks[label] = (
-                    "Summaries of this user's Claude.ai conversations:\n\n"
-                    + "\n\n".join(batch)
+                    "Summaries of this user's Claude.ai conversations:\n\n" + "\n\n".join(batch)
                 )
         except Exception:
             pass
@@ -271,7 +278,9 @@ def _extract_conversation_summaries(data: list, label_prefix: str) -> dict[str, 
             user_msgs = [
                 m.get("content", "")
                 for m in c.get("messages", [])
-                if isinstance(m, dict) and m.get("role") == "user" and isinstance(m.get("content"), str)
+                if isinstance(m, dict)
+                and m.get("role") == "user"
+                and isinstance(m.get("content"), str)
             ]
         if title or user_msgs:
             snippet = " | ".join(str(m)[:200] for m in user_msgs[-2:])
@@ -308,7 +317,9 @@ def _preprocess_chatgpt(root: Path) -> dict[str, str]:
     if mem_path.exists():
         try:
             raw = mem_path.read_text(encoding="utf-8", errors="ignore")
-            chunks["[ChatGPT memories]"] = "ChatGPT stored memories about this user:\n\n" + raw[:MAX_CHUNK_BYTES]
+            chunks["[ChatGPT memories]"] = (
+                "ChatGPT stored memories about this user:\n\n" + raw[:MAX_CHUNK_BYTES]
+            )
             handled.add(mem_path.name)
         except Exception:
             pass
@@ -318,7 +329,9 @@ def _preprocess_chatgpt(root: Path) -> dict[str, str]:
     if user_path.exists():
         try:
             data = json.loads(user_path.read_text(encoding="utf-8", errors="ignore"))
-            chunks["[ChatGPT user profile]"] = "ChatGPT user account data:\n" + json.dumps(data, indent=2)[:MAX_CHUNK_BYTES]
+            chunks["[ChatGPT user profile]"] = (
+                "ChatGPT user account data:\n" + json.dumps(data, indent=2)[:MAX_CHUNK_BYTES]
+            )
             handled.add(user_path.name)
         except Exception:
             pass
@@ -331,10 +344,14 @@ def _preprocess_chatgpt(root: Path) -> dict[str, str]:
             if json_file.stat().st_size > 500_000_000:  # skip >500MB files without ijson
                 try:
                     import ijson
+
                     with open(json_file, "rb") as f:
                         data = list(ijson.items(f, "item"))
                 except ImportError:
-                    print(f"[Synapse AI Import] Skipping large file (install ijson): {json_file.name}", flush=True)
+                    print(
+                        f"[Synapse AI Import] Skipping large file (install ijson): {json_file.name}",
+                        flush=True,
+                    )
                     continue
             else:
                 data = json.loads(json_file.read_text(encoding="utf-8", errors="ignore"))
@@ -343,7 +360,10 @@ def _preprocess_chatgpt(root: Path) -> dict[str, str]:
                 label_prefix = f"ChatGPT {json_file.stem}"
                 conv_chunks = _extract_conversation_summaries(data, label_prefix)
                 chunks.update(conv_chunks)
-                print(f"[Synapse AI Import] Found conversation history in {json_file.name}: {len(conv_chunks)} chunks", flush=True)
+                print(
+                    f"[Synapse AI Import] Found conversation history in {json_file.name}: {len(conv_chunks)} chunks",
+                    flush=True,
+                )
         except Exception:
             continue
 
@@ -377,6 +397,7 @@ def _preprocess_single_file(path: Path) -> dict[str, str]:
 
 # ─── Identity detection ────────────────────────────────────────────────────────
 
+
 def _detect_account_owner(target: Path, provider: str) -> str | None:
     """Extract the account owner's name from the export metadata."""
     try:
@@ -404,6 +425,7 @@ def _get_vault_owner(config: "SynapseConfig") -> str | None:
     try:
         from .memory_file import key_to_path, parse_memory_text
         from .encryption import read_text
+
         vault = config.vault_path
         profile_path = key_to_path(vault, "identity.profile")
         if not profile_path.exists():
@@ -472,7 +494,10 @@ def _preprocess_filtered_jsonl(
                 label = f"[{jsonl_file.stem}] {title} ({cid[:8]})"
                 # Trim to chunk size
                 chunks[label] = text[:MAX_CHUNK_BYTES]
-    print(f"[Synapse AI Import] Filtered JSONL: {len(chunks)} conversations loaded, {skipped} blacklisted skipped", flush=True)
+    print(
+        f"[Synapse AI Import] Filtered JSONL: {len(chunks)} conversations loaded, {skipped} blacklisted skipped",
+        flush=True,
+    )
     return chunks
 
 
@@ -514,9 +539,8 @@ def _save_resume(config: "SynapseConfig", source_path: str, failed_chunks: dict[
     )
 
 
-
-
 # ─── Public entry point ────────────────────────────────────────────────────────
+
 
 def import_ai_export(
     config: "SynapseConfig",
@@ -628,8 +652,7 @@ def import_ai_export(
 
     with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
         futures = {
-            pool.submit(_extract_chunk, label, text): label
-            for label, text in chunks.items()
+            pool.submit(_extract_chunk, label, text): label for label, text in chunks.items()
         }
         done = 0
         for future in as_completed(futures):
@@ -702,6 +725,7 @@ def import_filtered_jsonl(
 
     def _extract_chunk(label: str, text: str) -> list[dict[str, Any]]:
         from .groq_client import parse_json_patches
+
         user_msg = (
             f"Account owner: {detected_owner}\n"
             "Extract only durable memories about this account owner.\n\n"
@@ -712,8 +736,7 @@ def import_filtered_jsonl(
 
     with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
         futures = {
-            pool.submit(_extract_chunk, label, text): label
-            for label, text in chunks.items()
+            pool.submit(_extract_chunk, label, text): label for label, text in chunks.items()
         }
         done = 0
         for future in as_completed(futures):
@@ -725,7 +748,9 @@ def import_filtered_jsonl(
                 failed_chunks[label] = chunks[label]
                 print(f"[Synapse AI Import] FAILED: {label} — {exc}", flush=True)
             done += 1
-            print(f"[Synapse AI Import] {done}/{total} -> {len(patches)} patches: {label}", flush=True)
+            print(
+                f"[Synapse AI Import] {done}/{total} -> {len(patches)} patches: {label}", flush=True
+            )
             proposals.extend(patches)
 
     proposals = _dedupe_proposals(proposals)
@@ -743,21 +768,55 @@ def import_filtered_jsonl(
 # Tag → vault category mapping
 _TAG_CATEGORIES: dict[str, str] = {
     # coding / tech
-    "coding": "coding", "programming": "coding", "python": "coding", "javascript": "coding",
-    "web": "coding", "software": "coding", "development": "coding", "ai": "coding",
-    "machine learning": "coding", "data science": "coding", "cybersecurity": "coding",
-    "ctf": "coding", "blender": "coding", "3d": "coding", "automation": "coding",
+    "coding": "coding",
+    "programming": "coding",
+    "python": "coding",
+    "javascript": "coding",
+    "web": "coding",
+    "software": "coding",
+    "development": "coding",
+    "ai": "coding",
+    "machine learning": "coding",
+    "data science": "coding",
+    "cybersecurity": "coding",
+    "ctf": "coding",
+    "blender": "coding",
+    "3d": "coding",
+    "automation": "coding",
     # projects
-    "project": "projects", "synapse": "projects", "app": "projects", "tool": "projects",
-    "startup": "projects", "business": "projects",
+    "project": "projects",
+    "synapse": "projects",
+    "app": "projects",
+    "tool": "projects",
+    "startup": "projects",
+    "business": "projects",
     # life / personal
-    "life": "life", "health": "life", "fitness": "life", "food": "life", "travel": "life",
-    "photography": "life", "music": "life", "art": "life", "badminton": "life",
-    "sport": "life", "social": "life", "family": "life", "relationship": "life",
+    "life": "life",
+    "health": "life",
+    "fitness": "life",
+    "food": "life",
+    "travel": "life",
+    "photography": "life",
+    "music": "life",
+    "art": "life",
+    "badminton": "life",
+    "sport": "life",
+    "social": "life",
+    "family": "life",
+    "relationship": "life",
     # study / learning
-    "study": "study", "academic": "study", "learning": "study", "education": "study",
-    "chemistry": "study", "physics": "study", "math": "study", "mathematics": "study",
-    "biology": "study", "history": "study", "essay": "study", "exam": "study",
+    "study": "study",
+    "academic": "study",
+    "learning": "study",
+    "education": "study",
+    "chemistry": "study",
+    "physics": "study",
+    "math": "study",
+    "mathematics": "study",
+    "biology": "study",
+    "history": "study",
+    "essay": "study",
+    "exam": "study",
 }
 
 _DEFAULT_CATEGORY = "misc"
@@ -775,6 +834,7 @@ def _categorise_summary(tags: list[str], title: str) -> list[str]:
 
 def _slug(text: str) -> str:
     import re
+
     return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")[:60]
 
 
@@ -837,7 +897,7 @@ def import_synapse_summaries(
             f"---\n"
             f"key: {vault_key}\n"
             f"type: chat_summary\n"
-            f"title: \"{title.replace(chr(34), chr(39))}\"\n"
+            f'title: "{title.replace(chr(34), chr(39))}"\n'
             f"categories: [{cats_yaml}]\n"
             f"tags: [{tags_yaml}]\n"
             f"---\n"
@@ -857,7 +917,9 @@ def import_synapse_summaries(
         if tasks:
             sections.append("## Tasks\n\n" + "\n".join(f"- {x}" for x in tasks) + "\n")
         if memory_candidates:
-            sections.append("## Memory Candidates\n\n" + "\n".join(f"- {x}" for x in memory_candidates) + "\n")
+            sections.append(
+                "## Memory Candidates\n\n" + "\n".join(f"- {x}" for x in memory_candidates) + "\n"
+            )
         if search_keywords:
             sections.append(f"## Keywords\n\n{', '.join(search_keywords)}\n")
 
@@ -866,14 +928,16 @@ def import_synapse_summaries(
         written += 1
 
         for cat in categories:
-            category_index.setdefault(cat, []).append({
-                "title": title,
-                "key": vault_key,
-                "link": f"chats/{cid}",  # Obsidian resolves by path, not key
-                "summary": summary_short,
-                "key_facts": key_facts[:4],
-                "memory_candidates": memory_candidates[:3],
-            })
+            category_index.setdefault(cat, []).append(
+                {
+                    "title": title,
+                    "key": vault_key,
+                    "link": f"chats/{cid}",  # Obsidian resolves by path, not key
+                    "summary": summary_short,
+                    "key_facts": key_facts[:4],
+                    "memory_candidates": memory_candidates[:3],
+                }
+            )
 
     # Write category index pages
     index_files_written: list[str] = []
@@ -892,7 +956,10 @@ def import_synapse_summaries(
         idx_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
         index_files_written.append(cat)
 
-    print(f"[Synapse Summaries Import] Written {written} chat files, {len(index_files_written)} index pages", flush=True)
+    print(
+        f"[Synapse Summaries Import] Written {written} chat files, {len(index_files_written)} index pages",
+        flush=True,
+    )
 
     return {
         "written": written,
@@ -944,7 +1011,13 @@ def ingest_text(config: "SynapseConfig", text: str, label: str = "[pasted text]"
     total = len(chunks)
     with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
         futures = {
-            pool.submit(lambda lbl, txt: parse_json_patches(best_complete(config, _SYSTEM_PROMPT, f"Source: {lbl}\n\n---\n\n{txt}")), lbl, txt): lbl
+            pool.submit(
+                lambda lbl, txt: parse_json_patches(
+                    best_complete(config, _SYSTEM_PROMPT, f"Source: {lbl}\n\n---\n\n{txt}")
+                ),
+                lbl,
+                txt,
+            ): lbl
             for lbl, txt in chunks
         }
         done = 0
@@ -952,7 +1025,10 @@ def ingest_text(config: "SynapseConfig", text: str, label: str = "[pasted text]"
             patches = future.result()
             done += 1
             lbl = futures[future]
-            print(f"[Synapse Ingest] chunk {done}/{total} -> {len(patches)} patches: {lbl}", flush=True)
+            print(
+                f"[Synapse Ingest] chunk {done}/{total} -> {len(patches)} patches: {lbl}",
+                flush=True,
+            )
             proposals.extend(patches)
 
     return {"proposals": proposals}
@@ -1034,6 +1110,7 @@ def save_chat_memory(
     try:
         from .index import MemoryIndex
         from .encryption import read_text
+
         idx = MemoryIndex(vault, lambda p: read_text(config, p))
         idx.upsert_file(md_path)
     except Exception:
@@ -1045,7 +1122,6 @@ def save_chat_memory(
         "file": str(md_path.relative_to(vault)).replace("\\", "/"),
         "categories": categories,
         "message": (
-            f"Saved as chats/{cid}.md. "
-            "Run memory_build_graph to wire it into the topic graph."
+            f"Saved as chats/{cid}.md. " "Run memory_build_graph to wire it into the topic graph."
         ),
     }

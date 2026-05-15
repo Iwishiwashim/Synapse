@@ -1,4 +1,5 @@
 import sys, json
+
 sys.stdout.reconfigure(encoding="utf-8")
 from server.config import load_config
 from server.ai_importer import import_ai_export

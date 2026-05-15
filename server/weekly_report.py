@@ -32,9 +32,26 @@ def _render_report(
 ) -> str:
     lines = [f"# Synapse Report - Week of {week_start.isoformat()}", ""]
     lines += ["## Written this week", *_bullets(written, "No approved writes found."), ""]
-    lines += ["## Pending approval", *_bullets([f"{p['key']} - {p.get('reason', 'pending')}" for p in pending], "No pending approvals."), ""]
-    lines += ["## Rejected this week", *_bullets([f"{r['key']} - rejected, {r.get('reason') or 'no reason provided'}" for r in rejected], "No rejected patches."), ""]
-    lines += ["## Conflicts detected", "- Run `memory.conflicts` for current conflict analysis.", ""]
+    lines += [
+        "## Pending approval",
+        *_bullets(
+            [f"{p['key']} - {p.get('reason', 'pending')}" for p in pending], "No pending approvals."
+        ),
+        "",
+    ]
+    lines += [
+        "## Rejected this week",
+        *_bullets(
+            [f"{r['key']} - rejected, {r.get('reason') or 'no reason provided'}" for r in rejected],
+            "No rejected patches.",
+        ),
+        "",
+    ]
+    lines += [
+        "## Conflicts detected",
+        "- Run `memory.conflicts` for current conflict analysis.",
+        "",
+    ]
     lines += [
         "## Memory health",
         f"- Total memories: {stats.get('total', 0)}",

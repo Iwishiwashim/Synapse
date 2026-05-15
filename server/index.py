@@ -66,6 +66,7 @@ class MemoryIndex:
         # Rebuild semantic embeddings if API key provided
         if api_key:
             from .embeddings import embed_document, upsert_vector
+
             for path in sorted(self.vault.rglob("*.md")):
                 if path.name.startswith("_"):
                     continue
@@ -86,7 +87,9 @@ class MemoryIndex:
         }
         with self.connect() as conn:
             try:
-                indexed = {row["file_path"] for row in conn.execute("SELECT file_path FROM memories")}
+                indexed = {
+                    row["file_path"] for row in conn.execute("SELECT file_path FROM memories")
+                }
             except sqlite3.DatabaseError:
                 indexed = set()
         if files != indexed:
@@ -169,7 +172,7 @@ class MemoryIndex:
         for row, raw in zip(rows, raw_scores):
             d = dict(row)
             file_weight = float(d.pop("weight") or 0.5)
-            bm25_norm = raw / max_score                          # 0.0–1.0 relevance
+            bm25_norm = raw / max_score  # 0.0–1.0 relevance
             # Blend: 80% FTS relevance, 20% file importance weight
             d["score"] = round(bm25_norm * 0.8 + file_weight * 0.2, 4)
             d.pop("bm25_score", None)
@@ -186,7 +189,9 @@ class MemoryIndex:
         self.rebuild_if_out_of_sync()
         with self.connect() as conn:
             total = conn.execute("SELECT COUNT(*) AS count FROM memories").fetchone()["count"]
-            rows = conn.execute("SELECT confidence, COUNT(*) AS count FROM memories GROUP BY confidence").fetchall()
+            rows = conn.execute(
+                "SELECT confidence, COUNT(*) AS count FROM memories GROUP BY confidence"
+            ).fetchall()
         stats = {"total": total, "confirmed": 0, "proposed": 0, "deprecated": 0}
         for row in rows:
             if row["confidence"] in stats:

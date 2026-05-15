@@ -10,7 +10,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from openai import OpenAI
 from groq import Groq
 
-
 # ============================================================
 # SYNAPSE CHAT FILTER / TRIAGE INDEXER
 #
@@ -125,14 +124,12 @@ FORCE_REVIEW = False
 
 if not OPENROUTER_API_KEY:
     raise ValueError(
-        "Missing OPENROUTER_API_KEY environment variable. "
-        "Set it before running this script."
+        "Missing OPENROUTER_API_KEY environment variable. " "Set it before running this script."
     )
 
 if not GROQ_API_KEY:
     raise ValueError(
-        "Missing GROQ_API_KEY environment variable. "
-        "Set it before running this script."
+        "Missing GROQ_API_KEY environment variable. " "Set it before running this script."
     )
 
 openrouter_client = OpenAI(
@@ -293,6 +290,7 @@ Important:
 # HELPERS
 # ============================================================
 
+
 def safe_filename(text, max_len=100):
     text = str(text).strip()
 
@@ -324,7 +322,7 @@ def clean_json_text(raw):
     last = text.rfind("}")
 
     if first != -1 and last != -1 and last > first:
-        text = text[first:last + 1]
+        text = text[first : last + 1]
 
     return text
 
@@ -448,14 +446,16 @@ def build_index(conversations):
         writer.writeheader()
 
         for r in records:
-            writer.writerow({
-                "source_file": r["source_file"],
-                "source_line": r["source_line"],
-                "conversation_id": r["conversation_id"],
-                "title": r["title"],
-                "clean_chars": r["clean_chars"],
-                "estimated_tokens": r["estimated_tokens"],
-            })
+            writer.writerow(
+                {
+                    "source_file": r["source_file"],
+                    "source_line": r["source_line"],
+                    "conversation_id": r["conversation_id"],
+                    "title": r["title"],
+                    "clean_chars": r["clean_chars"],
+                    "estimated_tokens": r["estimated_tokens"],
+                }
+            )
 
     with open(md_path, "w", encoding="utf-8") as f:
         f.write("| source_file | line | conversation_id | title | chars | est_tokens |\n")
@@ -532,6 +532,7 @@ def decision_path(chunk_index):
 # ============================================================
 # MODEL REVIEW FUNCTIONS
 # ============================================================
+
 
 def review_index_chunk_with_groq(chunk, chunk_index, total_chunks):
     payload = {
@@ -686,19 +687,13 @@ def review_all_chunks(chunks):
 
         return chunk_index, result
 
-    jobs = [
-        (i, chunk)
-        for i, chunk in enumerate(chunks, start=1)
-    ]
+    jobs = [(i, chunk) for i, chunk in enumerate(chunks, start=1)]
 
     completed = 0
     errors = 0
 
     with ThreadPoolExecutor(max_workers=OPENROUTER_WORKERS) as executor:
-        future_to_job = {
-            executor.submit(worker, job): job
-            for job in jobs
-        }
+        future_to_job = {executor.submit(worker, job): job for job in jobs}
 
         for future in as_completed(future_to_job):
             chunk_index, _chunk = future_to_job[future]
@@ -753,6 +748,7 @@ def review_all_chunks(chunks):
 # OUTPUT TABLES
 # ============================================================
 
+
 def write_decision_tables(decisions):
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
@@ -779,18 +775,20 @@ def write_decision_tables(decisions):
         writer.writeheader()
 
         for d in decisions:
-            writer.writerow({
-                "action": d.get("action", ""),
-                "importance": d.get("importance", ""),
-                "sensitivity_level": d.get("sensitivity_level", ""),
-                "sensitivity_types": ", ".join(d.get("sensitivity_types", [])),
-                "source_file": d.get("source_file", ""),
-                "source_line": d.get("source_line", ""),
-                "conversation_id": d.get("conversation_id", ""),
-                "title": d.get("title", ""),
-                "reason": d.get("reason", ""),
-                "tags": ", ".join(d.get("tags", [])),
-            })
+            writer.writerow(
+                {
+                    "action": d.get("action", ""),
+                    "importance": d.get("importance", ""),
+                    "sensitivity_level": d.get("sensitivity_level", ""),
+                    "sensitivity_types": ", ".join(d.get("sensitivity_types", [])),
+                    "source_file": d.get("source_file", ""),
+                    "source_line": d.get("source_line", ""),
+                    "conversation_id": d.get("conversation_id", ""),
+                    "title": d.get("title", ""),
+                    "reason": d.get("reason", ""),
+                    "tags": ", ".join(d.get("tags", [])),
+                }
+            )
 
     with open(md_path, "w", encoding="utf-8") as f:
         f.write(
@@ -825,6 +823,7 @@ def write_decision_tables(decisions):
 # COPY FILTERED / REDFLAGGED CHATS
 # ============================================================
 
+
 def copy_filtered_chats(conversations, decisions):
     FILTERED_JSON_FOLDER.mkdir(parents=True, exist_ok=True)
     FILTERED_JSONL_FOLDER.mkdir(parents=True, exist_ok=True)
@@ -832,11 +831,7 @@ def copy_filtered_chats(conversations, decisions):
     REDFLAG_JSON_FOLDER.mkdir(parents=True, exist_ok=True)
     REDFLAG_JSONL_FOLDER.mkdir(parents=True, exist_ok=True)
 
-    decision_by_id = {
-        d.get("conversation_id"): d
-        for d in decisions
-        if d.get("conversation_id")
-    }
+    decision_by_id = {d.get("conversation_id"): d for d in decisions if d.get("conversation_id")}
 
     kept = []
     skipped = []
@@ -921,11 +916,7 @@ def copy_filtered_chats(conversations, decisions):
 
     with open(kept_ids_path, "w", encoding="utf-8") as f:
         for c, d in kept:
-            f.write(
-                f"{c.get('conversation_id')} | "
-                f"{d.get('action')} | "
-                f"{c.get('title')}\n"
-            )
+            f.write(f"{c.get('conversation_id')} | " f"{d.get('action')} | " f"{c.get('title')}\n")
 
     with open(skipped_ids_path, "w", encoding="utf-8") as f:
         for c, d in skipped:
@@ -966,6 +957,7 @@ def copy_filtered_chats(conversations, decisions):
 # FINAL STRUCTURE
 # ============================================================
 
+
 def print_final_structure():
     print("\nOUTPUT STRUCTURE")
     print("=" * 100)
@@ -1005,6 +997,7 @@ def print_final_structure():
 # ============================================================
 # MAIN
 # ============================================================
+
 
 def main():
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)

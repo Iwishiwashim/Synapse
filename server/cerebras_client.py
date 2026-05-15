@@ -1,4 +1,5 @@
 """Cerebras inference client for Synapse; primary extractor, Groq is fallback."""
+
 from __future__ import annotations
 
 import json
@@ -24,6 +25,7 @@ def get_client(config: "SynapseConfig") -> Any:
         raise ValueError("cerebras_api_key required; set CEREBRAS_API_KEY in .env")
     try:
         from cerebras.cloud.sdk import Cerebras
+
         return Cerebras(api_key=key)
     except ImportError:
         raise ImportError("cerebras-cloud-sdk not installed (pip install cerebras-cloud-sdk)")
@@ -48,7 +50,9 @@ def cerebras_complete(client: Any, system: str, user: str, max_tokens: int = 409
         except Exception as exc:
             msg = str(exc).lower()
             if "timed out" in msg or "timeout" in msg:
-                raise RuntimeError(f"Cerebras request timed out after {_REQUEST_TIMEOUT:.0f}s") from exc
+                raise RuntimeError(
+                    f"Cerebras request timed out after {_REQUEST_TIMEOUT:.0f}s"
+                ) from exc
             if "queue" in msg or "429" in msg or "too_many_requests" in msg:
                 if model == _MODEL_PRIMARY:
                     model = _MODEL_FAST

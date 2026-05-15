@@ -6,6 +6,7 @@ Outputs:
   - vault/metadata/topic_graph.json
   - Updated frontmatter (related field) + ## Related Conversations section in each chat file
 """
+
 from __future__ import annotations
 
 import json
@@ -22,6 +23,7 @@ from .config import SynapseConfig
 # Parsing helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     if not text.startswith("---"):
         return {}, text
@@ -29,7 +31,7 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     if end == -1:
         return {}, text
     fm_text = text[3:end].strip()
-    body = text[end + 4:].lstrip("\n")
+    body = text[end + 4 :].lstrip("\n")
     try:
         fm = yaml.safe_load(fm_text) or {}
     except Exception:
@@ -61,11 +63,48 @@ def _extract_section(body: str, heading: str) -> list[str]:
 def _tokenise(text: str) -> set[str]:
     """Lower-case word tokens, length ≥ 3, ignoring common stop words."""
     _STOPS = {
-        "the", "and", "for", "with", "that", "this", "from", "are", "was",
-        "were", "has", "have", "had", "not", "but", "can", "its", "user",
-        "also", "will", "been", "they", "their", "more", "used", "use",
-        "using", "about", "into", "when", "which", "some", "than", "then",
-        "one", "all", "any", "each", "both", "only", "very", "just",
+        "the",
+        "and",
+        "for",
+        "with",
+        "that",
+        "this",
+        "from",
+        "are",
+        "was",
+        "were",
+        "has",
+        "have",
+        "had",
+        "not",
+        "but",
+        "can",
+        "its",
+        "user",
+        "also",
+        "will",
+        "been",
+        "they",
+        "their",
+        "more",
+        "used",
+        "use",
+        "using",
+        "about",
+        "into",
+        "when",
+        "which",
+        "some",
+        "than",
+        "then",
+        "one",
+        "all",
+        "any",
+        "each",
+        "both",
+        "only",
+        "very",
+        "just",
     }
     tokens = re.findall(r"[a-z][a-z0-9_\-]*", text.lower())
     return {t for t in tokens if len(t) >= 3 and t not in _STOPS}
@@ -74,6 +113,7 @@ def _tokenise(text: str) -> set[str]:
 # ---------------------------------------------------------------------------
 # Node loading
 # ---------------------------------------------------------------------------
+
 
 def _load_nodes(chats_dir: Path) -> list[dict[str, Any]]:
     nodes = []
@@ -95,25 +135,28 @@ def _load_nodes(chats_dir: Path) -> list[dict[str, Any]]:
 
         title_tokens = _tokenise(title)
 
-        nodes.append({
-            "chat_id": chat_id,
-            "title": title,
-            "path": str(md),
-            "tags": tags,
-            "categories": categories,
-            "projects": projects,
-            "keyword_tokens": keyword_tokens,
-            "title_tokens": title_tokens,
-            "raw_text": text,
-            "frontmatter": fm,
-            "body": body,
-        })
+        nodes.append(
+            {
+                "chat_id": chat_id,
+                "title": title,
+                "path": str(md),
+                "tags": tags,
+                "categories": categories,
+                "projects": projects,
+                "keyword_tokens": keyword_tokens,
+                "title_tokens": title_tokens,
+                "raw_text": text,
+                "frontmatter": fm,
+                "body": body,
+            }
+        )
     return nodes
 
 
 # ---------------------------------------------------------------------------
 # Edge scoring
 # ---------------------------------------------------------------------------
+
 
 def _jaccard(a: set, b: set) -> float:
     if not a or not b:
@@ -154,6 +197,7 @@ def _edge_score(a: dict, b: dict) -> float:
 # ---------------------------------------------------------------------------
 # Graph construction via inverted index (avoids O(n²) full scan)
 # ---------------------------------------------------------------------------
+
 
 def _build_edges(nodes: list[dict], top_k: int = 8, min_score: float = 0.15) -> list[dict]:
     # Inverted index: tag/project → list of node indices
@@ -198,12 +242,14 @@ def _build_edges(nodes: list[dict], top_k: int = 8, min_score: float = 0.15) -> 
             else:
                 etype = "keyword_overlap"
 
-            edges.append({
-                "source": node["chat_id"],
-                "target": nodes[j]["chat_id"],
-                "type": etype,
-                "weight": round(score, 4),
-            })
+            edges.append(
+                {
+                    "source": node["chat_id"],
+                    "target": nodes[j]["chat_id"],
+                    "type": etype,
+                    "weight": round(score, 4),
+                }
+            )
 
     return edges
 
@@ -211,6 +257,7 @@ def _build_edges(nodes: list[dict], top_k: int = 8, min_score: float = 0.15) -> 
 # ---------------------------------------------------------------------------
 # Write outputs
 # ---------------------------------------------------------------------------
+
 
 def _related_for_node(chat_id: str, edges: list[dict], nodes_by_id: dict) -> list[dict]:
     """Return sorted related entries for a given chat_id."""
@@ -222,11 +269,13 @@ def _related_for_node(chat_id: str, edges: list[dict], nodes_by_id: dict) -> lis
     result = []
     for weight, tid in related[:8]:
         node = nodes_by_id.get(tid, {})
-        result.append({
-            "id": tid,
-            "title": node.get("title", tid),
-            "weight": weight,
-        })
+        result.append(
+            {
+                "id": tid,
+                "title": node.get("title", tid),
+                "weight": weight,
+            }
+        )
     return result
 
 
@@ -262,6 +311,7 @@ def _update_chat_file(node: dict, related: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
+
 
 def build_topic_graph(config: SynapseConfig, top_k: int = 8) -> dict[str, Any]:
     """
@@ -329,7 +379,10 @@ def build_topic_graph(config: SynapseConfig, top_k: int = 8) -> dict[str, Any]:
 # Deep search using graph traversal
 # ---------------------------------------------------------------------------
 
-def deep_search(config: SynapseConfig, query: str, depth: int = 2, top_k: int = 8) -> list[dict[str, Any]]:
+
+def deep_search(
+    config: SynapseConfig, query: str, depth: int = 2, top_k: int = 8
+) -> list[dict[str, Any]]:
     """
     FTS5 entry search → graph expansion → ranked results.
     Returns top_k chat summaries most relevant to query.
@@ -379,7 +432,7 @@ def deep_search(config: SynapseConfig, query: str, depth: int = 2, top_k: int = 
     fts_score_map: dict[str, float] = {}
     for hit in chat_hits[:20]:
         # key format: chats.<uuid>
-        cid = hit["key"][len("chats."):]
+        cid = hit["key"][len("chats.") :]
         if cid not in fts_score_map:
             entry_ids.append(cid)
             fts_score_map[cid] = float(hit.get("score", 1.0))
@@ -442,16 +495,18 @@ def deep_search(config: SynapseConfig, query: str, depth: int = 2, top_k: int = 
             if len(summary_lines) >= 3:
                 break
 
-        results.append({
-            "chat_id": cid,
-            "key": f"chats.{cid}",
-            "title": fm.get("title", cid),
-            "tags": node_meta.get("tags", []),
-            "projects": node_meta.get("projects", []),
-            "graph_score": round(_rank_score(cid), 4),
-            "is_direct_hit": cid in fts_score_map,
-            "summary": " ".join(summary_lines)[:400],
-            "related": fm.get("related", [])[:4],
-        })
+        results.append(
+            {
+                "chat_id": cid,
+                "key": f"chats.{cid}",
+                "title": fm.get("title", cid),
+                "tags": node_meta.get("tags", []),
+                "projects": node_meta.get("projects", []),
+                "graph_score": round(_rank_score(cid), 4),
+                "is_direct_hit": cid in fts_score_map,
+                "summary": " ".join(summary_lines)[:400],
+                "related": fm.get("related", [])[:4],
+            }
+        )
 
     return results

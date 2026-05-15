@@ -63,14 +63,8 @@ def load_config(config_path: Path | None = None) -> SynapseConfig:
         or os.environ.get("GOOGLE_API_KEY")
         or str(values.get("gemini_api_key", ""))
     )
-    groq_key = (
-        os.environ.get("GROQ_API_KEY")
-        or str(values.get("groq_api_key", ""))
-    )
-    cerebras_key = (
-        os.environ.get("CEREBRAS_API_KEY")
-        or str(values.get("cerebras_api_key", ""))
-    )
+    groq_key = os.environ.get("GROQ_API_KEY") or str(values.get("groq_api_key", ""))
+    cerebras_key = os.environ.get("CEREBRAS_API_KEY") or str(values.get("cerebras_api_key", ""))
 
     return SynapseConfig(
         root_path=root,

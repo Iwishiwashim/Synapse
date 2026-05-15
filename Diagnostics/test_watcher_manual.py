@@ -3,6 +3,7 @@ Manual watcher smoke test — no API key needed.
 Tests: start, file detection, debounce, status, stop.
 Run: python test_watcher_manual.py
 """
+
 import sys
 import tempfile
 import time
@@ -20,7 +21,7 @@ cfg = SynapseConfig(root_path=ROOT, vault_path=ROOT / "vault")
 def section(title: str) -> None:
     print(f"\n{'='*50}")
     print(f"  {title}")
-    print('='*50)
+    print("=" * 50)
 
 
 with tempfile.TemporaryDirectory() as tmpdir:

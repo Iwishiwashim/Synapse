@@ -14,42 +14,114 @@ if TYPE_CHECKING:
     from .config import SynapseConfig
 
 SKIP_DIRS = {
-    "node_modules", "__pycache__", ".venv", "venv", ".git",
-    "dist", "build", ".next", "release", "desktop-artifacts",
-    "out", ".turbo", ".cache", "coverage",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".git",
+    "dist",
+    "build",
+    ".next",
+    "release",
+    "desktop-artifacts",
+    "out",
+    ".turbo",
+    ".cache",
+    "coverage",
 }
 SKIP_EXTENSIONS = {
-    ".pyc", ".pyo", ".lock", ".ico", ".png", ".jpg", ".jpeg", ".gif",
-    ".svg", ".woff", ".woff2", ".ttf", ".eot", ".map", ".db", ".sqlite",
-    ".exe", ".dll", ".so", ".bin", ".zip", ".tar", ".gz",
+    ".pyc",
+    ".pyo",
+    ".lock",
+    ".ico",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".map",
+    ".db",
+    ".sqlite",
+    ".exe",
+    ".dll",
+    ".so",
+    ".bin",
+    ".zip",
+    ".tar",
+    ".gz",
 }
 PRIORITY_NAMES = {
-    "README.md", "readme.md", "README.txt",
-    "package.json", "pyproject.toml", "Cargo.toml", "go.mod",
+    "README.md",
+    "readme.md",
+    "README.txt",
+    "package.json",
+    "pyproject.toml",
+    "Cargo.toml",
+    "go.mod",
     "requirements.txt",
-    "next.config.ts", "next.config.js", "vite.config.ts", "vite.config.js",
-    "tsconfig.json", "config.yaml", "config.yml",
-    "main.py", "server.py", "app.py",
-    "index.ts", "index.js", "index.tsx",
+    "next.config.ts",
+    "next.config.js",
+    "vite.config.ts",
+    "vite.config.js",
+    "tsconfig.json",
+    "config.yaml",
+    "config.yml",
+    "main.py",
+    "server.py",
+    "app.py",
+    "index.ts",
+    "index.js",
+    "index.tsx",
 }
 PRIORITY_PATTERNS = [
-    re.compile(r"^(main|index|app|server|entry|config|settings)\.(py|ts|js|tsx|jsx|yaml|yml|json)$"),
+    re.compile(
+        r"^(main|index|app|server|entry|config|settings)\.(py|ts|js|tsx|jsx|yaml|yml|json)$"
+    ),
     re.compile(r"^README", re.IGNORECASE),
     re.compile(r"^(electron|src)/(main|preload)\.(cjs|js|ts)$"),
 ]
 SOURCE_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".cs"}
 EXTENDED_CODE_EXTENSIONS = {
-    ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp",
-    ".rb", ".php", ".swift", ".kt", ".kts", ".dart", ".scala",
-    ".r", ".lua", ".sh", ".bash", ".zsh", ".ps1", ".sql",
-    ".ex", ".exs", ".hs", ".clj", ".fs", ".fsx", ".vim",
-    ".toml", ".ini", ".cfg",
+    ".cpp",
+    ".cc",
+    ".cxx",
+    ".c",
+    ".h",
+    ".hpp",
+    ".rb",
+    ".php",
+    ".swift",
+    ".kt",
+    ".kts",
+    ".dart",
+    ".scala",
+    ".r",
+    ".lua",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".ps1",
+    ".sql",
+    ".ex",
+    ".exs",
+    ".hs",
+    ".clj",
+    ".fs",
+    ".fsx",
+    ".vim",
+    ".toml",
+    ".ini",
+    ".cfg",
 }
 PLAIN_TEXT_EXTENSIONS = {".txt"}
 DATA_EXTENSIONS = {".json", ".md", ".txt", ".yaml", ".yml"}
 
 MAX_FILE_BYTES = 12_000
-MAX_TOTAL_BYTES = 500_000     # raised from 100KB to 500KB
+MAX_TOTAL_BYTES = 500_000  # raised from 100KB to 500KB
 _EXTRACT_WORKERS = 4
 _FN_BATCH_SIZE = 8
 _GEMMA_MODEL = "gemma-4-31b-it"
@@ -58,6 +130,7 @@ _GEMMA_MODEL = "gemma-4-31b-it"
 # ---------------------------------------------------------------------------
 # Gemma client (mirrors ai_importer._gemma_complete)
 # ---------------------------------------------------------------------------
+
 
 def _gemma_complete(config: "SynapseConfig", system: str, user: str) -> str:
     if not config.gemini_api_key:
@@ -71,7 +144,10 @@ def _gemma_complete(config: "SynapseConfig", system: str, user: str) -> str:
     client = genai.Client(api_key=config.gemini_api_key)
     contents = [
         types.Content(role="user", parts=[types.Part.from_text(text=system)]),
-        types.Content(role="model", parts=[types.Part.from_text(text="Understood. Provide the file to analyze.")]),
+        types.Content(
+            role="model",
+            parts=[types.Part.from_text(text="Understood. Provide the file to analyze.")],
+        ),
         types.Content(role="user", parts=[types.Part.from_text(text=user)]),
     ]
     chunks: list[str] = []
@@ -84,6 +160,7 @@ def _gemma_complete(config: "SynapseConfig", system: str, user: str) -> str:
 # ---------------------------------------------------------------------------
 # Incremental hash tracking
 # ---------------------------------------------------------------------------
+
 
 def _file_hash(path: Path) -> str:
     try:
@@ -106,6 +183,7 @@ def _load_hashes(graph_path: Path) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Public scan API
 # ---------------------------------------------------------------------------
+
 
 def scan_project(path_str: str) -> dict[str, Any]:
     """Raw file scan — returns tree + file contents, no AI extraction."""
@@ -205,7 +283,11 @@ def scan_and_extract(config: "SynapseConfig", path_str: str) -> dict[str, Any]:
                 return []
             header = f"[{ext.lstrip('.')} file: {rel_path}]\n\n"
             return _ai_extract_data_file(config, project_name, rel_path, header + rich_text)
-        if ext in DATA_EXTENSIONS or ext in PLAIN_TEXT_EXTENSIONS or ext in EXTENDED_CODE_EXTENSIONS:
+        if (
+            ext in DATA_EXTENSIONS
+            or ext in PLAIN_TEXT_EXTENSIONS
+            or ext in EXTENDED_CODE_EXTENSIONS
+        ):
             return _ai_extract_data_file(config, project_name, rel_path, content)
         patch = _ai_extract_file(config, project_name, rel_path, content)
         return [patch] if patch else []
@@ -216,7 +298,9 @@ def scan_and_extract(config: "SynapseConfig", path_str: str) -> dict[str, Any]:
         for future in as_completed(futures):
             patches = future.result()
             done += 1
-            print(f"[Synapse] {done}/{total} -> {len(patches)} patches: {futures[future]}", flush=True)
+            print(
+                f"[Synapse] {done}/{total} -> {len(patches)} patches: {futures[future]}", flush=True
+            )
             proposals.extend(patches)
 
     # --- AST code graph (all files, not just changed) ---
@@ -224,21 +308,22 @@ def scan_and_extract(config: "SynapseConfig", path_str: str) -> dict[str, Any]:
 
     # --- Function descriptions via Gemma (only for changed files' nodes) ---
     changed_file_ids = {
-        re.sub(r"[_\s]+", "-", Path(rel).stem).lower().replace("_", "-")
-        for rel in changed
+        re.sub(r"[_\s]+", "-", Path(rel).stem).lower().replace("_", "-") for rel in changed
     }
     fn_nodes = [
-        n for n in code_graph.get("nodes", [])
-        if n.get("type") in ("function", "class")
-        and n.get("parent", "") in changed_file_ids
+        n
+        for n in code_graph.get("nodes", [])
+        if n.get("type") in ("function", "class") and n.get("parent", "") in changed_file_ids
     ]
 
     fn_descriptions: dict[str, str] = {}
-    batches = [fn_nodes[i: i + _FN_BATCH_SIZE] for i in range(0, len(fn_nodes), _FN_BATCH_SIZE)]
+    batches = [fn_nodes[i : i + _FN_BATCH_SIZE] for i in range(0, len(fn_nodes), _FN_BATCH_SIZE)]
 
     with ThreadPoolExecutor(max_workers=_EXTRACT_WORKERS) as pool:
-        batch_futures = {pool.submit(_ai_describe_functions, config, project_name, b): i
-                         for i, b in enumerate(batches)}
+        batch_futures = {
+            pool.submit(_ai_describe_functions, config, project_name, b): i
+            for i, b in enumerate(batches)
+        }
         for future in as_completed(batch_futures):
             fn_descriptions.update(future.result())
 
@@ -252,13 +337,17 @@ def scan_and_extract(config: "SynapseConfig", path_str: str) -> dict[str, Any]:
 
     # --- Index into code_index.db (all nodes, fresh descriptions) ---
     from .diff import cleanup_stale_nodes
+
     cleanup_result = cleanup_stale_nodes(config, project_slug, code_graph)
 
     try:
         from .code_index import index_project
+
         # Build full description map: function descriptions + file-level (blank for non-functions)
         all_descriptions: dict[str, str] = {**fn_descriptions}
-        index_project(config.vault_path, config.gemini_api_key, project_slug, code_graph, all_descriptions)
+        index_project(
+            config.vault_path, config.gemini_api_key, project_slug, code_graph, all_descriptions
+        )
     except Exception as exc:
         print(f"[Synapse] code_index error: {exc}", flush=True)
 
@@ -430,6 +519,7 @@ def _ai_extract_file_fast(
 # JSON parsing
 # ---------------------------------------------------------------------------
 
+
 def _parse_patch(raw: str) -> dict[str, Any] | None:
     text = re.sub(r"^```[a-z]*\n?", "", raw.strip())
     text = re.sub(r"\n?```$", "", text).strip()
@@ -488,21 +578,24 @@ def _parse_patches(raw: str) -> list[dict[str, Any]]:
         content = str(item.get("content", "")).strip()
         if not key or not content:
             continue
-        result.append({
-            "key": key,
-            "content": content,
-            "type": str(item.get("type", "note")),
-            "scope": str(item.get("scope", "global")),
-            "weight": float(item.get("weight", 0.8)),
-            "signal": str(item.get("signal", "high_signal")),
-            "reason": str(item.get("reason", "")),
-        })
+        result.append(
+            {
+                "key": key,
+                "content": content,
+                "type": str(item.get("type", "note")),
+                "scope": str(item.get("scope", "global")),
+                "weight": float(item.get("weight", 0.8)),
+                "signal": str(item.get("signal", "high_signal")),
+                "reason": str(item.get("reason", "")),
+            }
+        )
     return result
 
 
 # ---------------------------------------------------------------------------
 # Function/class proposals
 # ---------------------------------------------------------------------------
+
 
 def _make_function_proposals(
     project_key: str, graph: dict[str, Any], descriptions: dict[str, str] | None = None
@@ -519,7 +612,7 @@ def _make_function_proposals(
 
         file_id = node.get("parent", "")
         node_id = node["id"]
-        fn_slug = node_id[len(file_id) + 1:] if node_id.startswith(file_id + "-") else node_id
+        fn_slug = node_id[len(file_id) + 1 :] if node_id.startswith(file_id + "-") else node_id
         vault_key = f"{project_key}.{file_id}.{fn_slug}"
 
         parent_key = f"{project_key}.{file_id}"
@@ -543,16 +636,18 @@ def _make_function_proposals(
             lines.append(f"\n{doc}")
         lines.append(f"\nDefined in `{rel_file}` at line {lineno}.")
 
-        proposals.append({
-            "key": vault_key,
-            "content": "\n".join(lines),
-            "type": "code",
-            "scope": "global",
-            "weight": 0.6,
-            "signal": "high_signal",
-            "reason": f"{ntype} node from {rel_file}",
-            "related": related,
-        })
+        proposals.append(
+            {
+                "key": vault_key,
+                "content": "\n".join(lines),
+                "type": "code",
+                "scope": "global",
+                "weight": 0.6,
+                "signal": "high_signal",
+                "reason": f"{ntype} node from {rel_file}",
+                "related": related,
+            }
+        )
 
     return proposals
 
@@ -583,6 +678,7 @@ def _is_vague(description: str, signature: str) -> bool:
 # Filesystem helpers
 # ---------------------------------------------------------------------------
 
+
 def _build_tree(root: Path, depth: int = 0, max_depth: int = 3) -> list[dict[str, Any]]:
     if depth >= max_depth:
         return []
@@ -595,8 +691,13 @@ def _build_tree(root: Path, depth: int = 0, max_depth: int = 3) -> list[dict[str
         if item.name.startswith(".") or item.name in SKIP_DIRS:
             continue
         if item.is_dir():
-            entries.append({"name": item.name, "type": "dir",
-                            "children": _build_tree(item, depth + 1, max_depth)})
+            entries.append(
+                {
+                    "name": item.name,
+                    "type": "dir",
+                    "children": _build_tree(item, depth + 1, max_depth),
+                }
+            )
         elif item.suffix.lower() not in SKIP_EXTENSIONS:
             entries.append({"name": item.name, "type": "file"})
     return entries
@@ -649,7 +750,13 @@ def _walk_priority(root: Path):
 
 
 def _walk_source(root: Path):
-    all_exts = SOURCE_EXTENSIONS | DATA_EXTENSIONS | SUPPORTED_EXTENSIONS | EXTENDED_CODE_EXTENSIONS | PLAIN_TEXT_EXTENSIONS
+    all_exts = (
+        SOURCE_EXTENSIONS
+        | DATA_EXTENSIONS
+        | SUPPORTED_EXTENSIONS
+        | EXTENDED_CODE_EXTENSIONS
+        | PLAIN_TEXT_EXTENSIONS
+    )
     candidates = []
     for f in root.rglob("*"):
         if not f.is_file() or _in_skip_dir(f, root):

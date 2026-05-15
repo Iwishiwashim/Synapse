@@ -9,6 +9,7 @@ Unlike dedup.py (Jaccard on word overlap), this module:
 Works even when duplicate files have completely different trigger words or keys,
 as long as they talk about the same topic semantically.
 """
+
 from __future__ import annotations
 
 import re
@@ -18,8 +19,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .config import SynapseConfig
 
-_SIMILARITY_THRESHOLD = 0.93   # cosine similarity above this = semantic duplicate
-_SAME_CATEGORY_ONLY = True      # only merge within the same top-level folder (projects/work/etc.)
+_SIMILARITY_THRESHOLD = 0.93  # cosine similarity above this = semantic duplicate
+_SAME_CATEGORY_ONLY = True  # only merge within the same top-level folder (projects/work/etc.)
 
 _MERGE_SYSTEM_PROMPT = """\
 You are a personal memory curator. You have two memory files about the same topic that need to be merged into one.
@@ -44,6 +45,7 @@ Output raw Markdown only. No explanation, no preamble.\
 
 # ─── Similarity engine ─────────────────────────────────────────────────────────
 
+
 def _find_duplicate_pairs(
     db_path: Path,
     entries: list[dict[str, Any]],
@@ -62,7 +64,7 @@ def _find_duplicate_pairs(
     seen: set[frozenset] = set()
 
     for i, a in enumerate(entries):
-        for b in entries[i + 1:]:
+        for b in entries[i + 1 :]:
             pair = frozenset([a["key"], b["key"]])
             if pair in seen:
                 continue
@@ -92,11 +94,13 @@ def _find_duplicate_pairs(
 
 # ─── AI merge ──────────────────────────────────────────────────────────────────
 
+
 def _ai_merge_content(
     config: "SynapseConfig", key_a: str, content_a: str, key_b: str, content_b: str
 ) -> str | None:
     """Ask the configured inference provider to merge two memory files."""
     from .groq_client import best_complete
+
     user_msg = (
         f"File 1 (key: {key_a}):\n\n{content_a}\n\n"
         f"---\n\n"
@@ -110,6 +114,7 @@ def _ai_merge_content(
 
 
 # ─── Load vault entries ────────────────────────────────────────────────────────
+
 
 def _load_entries(config: "SynapseConfig") -> list[dict[str, Any]]:
     from .encryption import read_text
@@ -126,16 +131,19 @@ def _load_entries(config: "SynapseConfig") -> list[dict[str, Any]]:
         key = str(fm.get("key") or path_to_key(vault, md))
         if not content.strip():
             continue
-        entries.append({
-            "key": key,
-            "path": md,
-            "frontmatter": fm,
-            "content": content,
-        })
+        entries.append(
+            {
+                "key": key,
+                "path": md,
+                "frontmatter": fm,
+                "content": content,
+            }
+        )
     return entries
 
 
 # ─── Git deletion helper ──────────────────────────────────────────────────────
+
 
 def _git_remove_and_commit(config: "SynapseConfig", path: Path, message: str) -> None:
     """Delete a file and commit its removal via git rm (not git add)."""
@@ -145,6 +153,7 @@ def _git_remove_and_commit(config: "SynapseConfig", path: Path, message: str) ->
         return
     try:
         from git import InvalidGitRepositoryError, Repo
+
         repo = Repo(config.root_path, search_parent_directories=True)
         if path.exists():
             # Use git rm to stage + delete in one step
@@ -169,6 +178,7 @@ def _git_remove_and_commit(config: "SynapseConfig", path: Path, message: str) ->
 
 # ─── Public entry point ────────────────────────────────────────────────────────
 
+
 def smart_merge_duplicates(
     config: "SynapseConfig",
     dry_run: bool = True,
@@ -189,14 +199,16 @@ def smart_merge_duplicates(
 
     report: list[dict[str, Any]] = []
     for a, b, sim in pairs:
-        report.append({
-            "key_a": a["key"],
-            "key_b": b["key"],
-            "similarity": sim,
-            "lengths": {"a": len(a["content"]), "b": len(b["content"])},
-            "keep": a["key"] if len(a["content"]) >= len(b["content"]) else b["key"],
-            "remove": b["key"] if len(a["content"]) >= len(b["content"]) else a["key"],
-        })
+        report.append(
+            {
+                "key_a": a["key"],
+                "key_b": b["key"],
+                "similarity": sim,
+                "lengths": {"a": len(a["content"]), "b": len(b["content"])},
+                "keep": a["key"] if len(a["content"]) >= len(b["content"]) else b["key"],
+                "remove": b["key"] if len(a["content"]) >= len(b["content"]) else a["key"],
+            }
+        )
 
     if dry_run:
         return {
@@ -239,11 +251,15 @@ def smart_merge_duplicates(
 
         merged_content = _ai_merge_content(
             config,
-            a["key"], a["content"],
-            b["key"], b["content"],
+            a["key"],
+            a["content"],
+            b["key"],
+            b["content"],
         )
         if not merged_content:
-            errors.append({"pair": f"{a['key']} + {b['key']}", "error": "Inference provider returned empty"})
+            errors.append(
+                {"pair": f"{a['key']} + {b['key']}", "error": "Inference provider returned empty"}
+            )
             continue
 
         # Build merged frontmatter: start from keep_entry, merge related lists
@@ -253,7 +269,9 @@ def smart_merge_duplicates(
         related_drop = set(fm_drop.get("related") or [])
         triggers_keep = set(fm_keep.get("triggers") or [])
         triggers_drop = set(fm_drop.get("triggers") or [])
-        fm_keep["related"] = sorted((related_keep | related_drop) - {keep_entry["key"], drop_entry["key"]})
+        fm_keep["related"] = sorted(
+            (related_keep | related_drop) - {keep_entry["key"], drop_entry["key"]}
+        )
         fm_keep["triggers"] = sorted(triggers_keep | triggers_drop)[:12]
         fm_keep["version"] = int(fm_keep.get("version", 1)) + 1
 
@@ -283,6 +301,7 @@ def smart_merge_duplicates(
             # Remove from embeddings DB
             try:
                 from .embeddings import delete_vector
+
                 delete_vector(db_path, drop_entry["key"])
             except Exception:
                 pass
@@ -291,6 +310,7 @@ def smart_merge_duplicates(
             try:
                 from .index import MemoryIndex
                 from .encryption import read_text as _rt
+
                 idx = MemoryIndex(config.vault_path, lambda p: _rt(config, p))
                 with idx.connect() as conn:
                     conn.execute("DELETE FROM memories WHERE key = ?", (drop_entry["key"],))
@@ -298,12 +318,14 @@ def smart_merge_duplicates(
             except Exception:
                 pass
 
-            merged.append({
-                "kept": keep_entry["key"],
-                "removed": drop_entry["key"],
-                "similarity": sim,
-                "commit": result.get("git", {}).get("commit", ""),
-            })
+            merged.append(
+                {
+                    "kept": keep_entry["key"],
+                    "removed": drop_entry["key"],
+                    "similarity": sim,
+                    "commit": result.get("git", {}).get("commit", ""),
+                }
+            )
             consumed.add(a["key"])
             consumed.add(b["key"])
 

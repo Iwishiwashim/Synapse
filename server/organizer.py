@@ -9,6 +9,7 @@ Each subfolder in the vault gets an index.md that:
 
 After building indexes, runs relink_all to refresh all cross-file wikilinks.
 """
+
 from __future__ import annotations
 
 from datetime import date
@@ -46,8 +47,10 @@ def organize_vault(config: SynapseConfig) -> dict[str, Any]:
         # Direct child .md files (skip _ files and existing index.md)
         children = sorted(
             [
-                f for f in folder.iterdir()
-                if f.is_file() and f.suffix == ".md"
+                f
+                for f in folder.iterdir()
+                if f.is_file()
+                and f.suffix == ".md"
                 and not f.name.startswith("_")
                 and f.stem != "index"
             ],
@@ -57,10 +60,9 @@ def organize_vault(config: SynapseConfig) -> dict[str, Any]:
         # Direct child subdirectories (skip _ and . prefixed)
         subdirs = sorted(
             [
-                d for d in folder.iterdir()
-                if d.is_dir()
-                and not d.name.startswith("_")
-                and not d.name.startswith(".")
+                d
+                for d in folder.iterdir()
+                if d.is_dir() and not d.name.startswith("_") and not d.name.startswith(".")
             ],
             key=lambda d: d.name,
         )

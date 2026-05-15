@@ -2,19 +2,21 @@
 Regression tests for core Synapse logic — no network, no LLM, no vault on disk.
 Run with: pytest tests/
 """
+
 from __future__ import annotations
 
 import json
 import tempfile
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # _parse_patch
 # ---------------------------------------------------------------------------
 
+
 def test_parse_patch_valid_json():
     from server.scanner import _parse_patch
+
     raw = '{"key": "projects.myapp.index", "content": "Main entry point.", "type": "code", "scope": "global", "weight": 0.8}'
     result = _parse_patch(raw)
     assert result is not None
@@ -24,6 +26,7 @@ def test_parse_patch_valid_json():
 
 def test_parse_patch_strips_markdown_fences():
     from server.scanner import _parse_patch
+
     raw = '```json\n{"key": "a.b", "content": "Some content."}\n```'
     result = _parse_patch(raw)
     assert result is not None
@@ -32,6 +35,7 @@ def test_parse_patch_strips_markdown_fences():
 
 def test_parse_patch_extracts_embedded_object():
     from server.scanner import _parse_patch
+
     raw = 'Here is the result:\n{"key": "x.y", "content": "Desc."}\nDone.'
     result = _parse_patch(raw)
     assert result is not None
@@ -40,16 +44,19 @@ def test_parse_patch_extracts_embedded_object():
 
 def test_parse_patch_returns_none_for_garbage():
     from server.scanner import _parse_patch
+
     assert _parse_patch("not json at all") is None
 
 
 def test_parse_patch_returns_none_missing_key():
     from server.scanner import _parse_patch
+
     assert _parse_patch('{"content": "No key field."}') is None
 
 
 def test_parse_patch_returns_none_missing_content():
     from server.scanner import _parse_patch
+
     assert _parse_patch('{"key": "a.b"}') is None
 
 
@@ -57,38 +64,48 @@ def test_parse_patch_returns_none_missing_content():
 # _is_vague
 # ---------------------------------------------------------------------------
 
+
 def test_is_vague_flags_short_generic():
     from server.scanner import _is_vague
+
     assert _is_vague("Handles the bridge process.", "def initBridge()") is True
 
 
 def test_is_vague_flags_paraphrase_of_name():
     from server.scanner import _is_vague
+
     assert _is_vague("Starts watching the files.", "def startWatcher()") is True
 
 
 def test_is_vague_passes_with_port_number():
     from server.scanner import _is_vague
+
     assert _is_vague("Listens on port 5056 for incoming requests.", "def startServer()") is False
 
 
 def test_is_vague_passes_with_camelcase():
     from server.scanner import _is_vague
+
     assert _is_vague("Calls findFreePort then spawns bridgeProcess.", "def startBridge()") is False
 
 
 def test_is_vague_passes_with_constant():
     from server.scanner import _is_vague
-    assert _is_vague("Reads MAX_FILE_BYTES from env and truncates input.", "def readFile()") is False
+
+    assert (
+        _is_vague("Reads MAX_FILE_BYTES from env and truncates input.", "def readFile()") is False
+    )
 
 
 def test_is_vague_passes_with_path():
     from server.scanner import _is_vague
+
     assert _is_vague("Writes output to ./vault/_graph.json.", "def saveGraph()") is False
 
 
 def test_is_vague_passes_with_backtick():
     from server.scanner import _is_vague
+
     assert _is_vague("Returns `{'status': 'ok'}` after flushing queue.", "def flush()") is False
 
 
@@ -96,8 +113,10 @@ def test_is_vague_passes_with_backtick():
 # _inject_wikilinks
 # ---------------------------------------------------------------------------
 
+
 def test_inject_wikilinks_appends_related():
     from server.diff import _inject_wikilinks
+
     result = _inject_wikilinks("Body text.", ["work.stack", "work.tools"])
     assert "Related:" in result
     assert "[[work/stack]]" in result
@@ -106,6 +125,7 @@ def test_inject_wikilinks_appends_related():
 
 def test_inject_wikilinks_replaces_existing_related_line():
     from server.diff import _inject_wikilinks
+
     content = "Body\n\nRelated: [[old/link]]"
     result = _inject_wikilinks(content, ["new.link"])
     assert "old" not in result
@@ -114,6 +134,7 @@ def test_inject_wikilinks_replaces_existing_related_line():
 
 def test_inject_wikilinks_empty_list_removes_related():
     from server.diff import _inject_wikilinks
+
     content = "Body\n\nRelated: [[some/link]]"
     result = _inject_wikilinks(content, [])
     assert "Related:" not in result
@@ -121,6 +142,7 @@ def test_inject_wikilinks_empty_list_removes_related():
 
 def test_inject_wikilinks_uses_pipe_separator():
     from server.diff import _inject_wikilinks
+
     result = _inject_wikilinks("X", ["a.b", "c.d"])
     assert " | " in result
 
@@ -129,13 +151,16 @@ def test_inject_wikilinks_uses_pipe_separator():
 # load_pending resilience
 # ---------------------------------------------------------------------------
 
+
 def _make_config(vault: Path):
     from server.config import SynapseConfig
+
     return SynapseConfig(root_path=vault.parent, vault_path=vault)
 
 
 def test_load_pending_missing_file_returns_empty():
     from server.diff import load_pending
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
@@ -144,6 +169,7 @@ def test_load_pending_missing_file_returns_empty():
 
 def test_load_pending_empty_file_returns_empty():
     from server.diff import load_pending
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
@@ -153,6 +179,7 @@ def test_load_pending_empty_file_returns_empty():
 
 def test_load_pending_newline_only_returns_empty():
     from server.diff import load_pending
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
@@ -162,6 +189,7 @@ def test_load_pending_newline_only_returns_empty():
 
 def test_load_pending_corrupt_json_returns_empty():
     from server.diff import load_pending
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
@@ -171,6 +199,7 @@ def test_load_pending_corrupt_json_returns_empty():
 
 def test_load_pending_valid_queue():
     from server.diff import load_pending
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
@@ -185,6 +214,7 @@ def test_load_pending_valid_queue():
 # cleanup_stale_nodes
 # ---------------------------------------------------------------------------
 
+
 def _write_md(path: Path, key: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f"---\nkey: {key}\n---\n\ncontent\n", encoding="utf-8")
@@ -192,6 +222,7 @@ def _write_md(path: Path, key: str) -> None:
 
 def test_cleanup_removes_stale_function_node():
     from server.diff import cleanup_stale_nodes
+
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         vault = Path(tmpdir) / "vault"
         fn_dir = vault / "projects" / "myapp" / "server"
@@ -208,6 +239,7 @@ def test_cleanup_removes_stale_function_node():
 
 def test_cleanup_keeps_current_function_node():
     from server.diff import cleanup_stale_nodes
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         fn_dir = vault / "projects" / "myapp" / "server"
@@ -230,6 +262,7 @@ def test_cleanup_keeps_current_function_node():
 
 def test_cleanup_ignores_unscanned_file_dirs():
     from server.diff import cleanup_stale_nodes
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         # 'utils' was NOT scanned — cleanup must leave it alone
@@ -247,6 +280,7 @@ def test_cleanup_ignores_unscanned_file_dirs():
 
 def test_cleanup_removes_empty_dir_after_last_node():
     from server.diff import cleanup_stale_nodes
+
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         vault = Path(tmpdir) / "vault"
         fn_dir = vault / "projects" / "myapp" / "server"
@@ -264,8 +298,10 @@ def test_cleanup_removes_empty_dir_after_last_node():
 # memory_save_chat
 # ---------------------------------------------------------------------------
 
+
 def test_save_chat_creates_file():
     from server.ai_importer import save_chat_memory
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         cfg = _make_config(vault)
@@ -288,6 +324,7 @@ def test_save_chat_creates_file():
 
 def test_save_chat_autogenerates_id():
     from server.ai_importer import save_chat_memory
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         cfg = _make_config(vault)
@@ -306,6 +343,7 @@ def test_save_chat_autogenerates_id():
 
 def test_save_chat_includes_key_facts():
     from server.ai_importer import save_chat_memory
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         cfg = _make_config(vault)
@@ -327,8 +365,10 @@ def test_save_chat_includes_key_facts():
 # memory_code_search — no-index error path (no LLM, no vault writes needed)
 # ---------------------------------------------------------------------------
 
+
 def test_code_search_returns_error_without_index():
     from server.functions import memory_code_search
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
@@ -343,8 +383,10 @@ def test_code_search_returns_error_without_index():
 # memory_deep_search — no-graph error path (no LLM, no vault writes needed)
 # ---------------------------------------------------------------------------
 
+
 def test_deep_search_returns_error_without_graph():
     from server.functions import memory_deep_search
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         (vault / "metadata").mkdir(parents=True)
@@ -358,6 +400,7 @@ def test_deep_search_returns_error_without_graph():
 def test_deep_search_returns_results_with_graph():
     from server.functions import memory_deep_search
     import json as _json
+
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         vault = Path(tmpdir) / "vault"
         meta = vault / "metadata"
@@ -377,9 +420,11 @@ def test_deep_search_returns_results_with_graph():
 # memory_auto — escalation logic
 # ---------------------------------------------------------------------------
 
+
 def test_auto_escalates_when_no_vault_hits():
     """Empty vault → no search results → deep_results key present (graph error is acceptable)."""
     from server.functions import memory_auto
+
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
@@ -397,7 +442,11 @@ def test_auto_no_escalate_when_confident(monkeypatch):
     confident_hit = [{"key": "work.stack", "score": 0.9, "reason": "direct match"}]
     monkeypatch.setattr(fn, "memory_search_tool", lambda *_: confident_hit)
     monkeypatch.setattr(fn, "memory_context", lambda *_: {})
-    monkeypatch.setattr(fn, "_deep_search", lambda *_: (_ for _ in ()).throw(AssertionError("deep_search must not be called")))
+    monkeypatch.setattr(
+        fn,
+        "_deep_search",
+        lambda *_: (_ for _ in ()).throw(AssertionError("deep_search must not be called")),
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
@@ -438,26 +487,32 @@ def test_auto_escalates_when_score_below_threshold(monkeypatch):
 # memory_commit — write_mode behaviour
 # ---------------------------------------------------------------------------
 
+
 def _make_config_with_mode(vault: Path, mode: str):
     from server.config import SynapseConfig
+
     return SynapseConfig(root_path=vault.parent, vault_path=vault, write_mode=mode)
 
 
 def test_commit_review_mode_leaves_patch_pending():
     """In review mode, memory_commit proposes but does not apply — patch_id in response, file not written."""
     from server.functions import memory_commit
+
     with tempfile.TemporaryDirectory() as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
         cfg = _make_config_with_mode(vault, "review")
-        result = memory_commit(cfg, {
-            "key": "work.testkey",
-            "content": "test content",
-            "type": "note",
-            "scope": "global",
-            "weight": 0.5,
-            "reason": "unit test",
-        })
+        result = memory_commit(
+            cfg,
+            {
+                "key": "work.testkey",
+                "content": "test content",
+                "type": "note",
+                "scope": "global",
+                "weight": 0.5,
+                "reason": "unit test",
+            },
+        )
         assert "patch_id" in result
         assert "diff" in result
         # File must NOT exist yet — only proposed, not applied
@@ -467,17 +522,21 @@ def test_commit_review_mode_leaves_patch_pending():
 def test_commit_auto_mode_writes_file():
     """In auto mode, memory_commit applies immediately — file must exist after the call."""
     from server.functions import memory_commit
+
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         vault = Path(tmpdir) / "vault"
         vault.mkdir()
         cfg = _make_config_with_mode(vault, "auto")
-        result = memory_commit(cfg, {
-            "key": "work.autokey",
-            "content": "auto written content",
-            "type": "note",
-            "scope": "global",
-            "weight": 0.5,
-            "reason": "unit test",
-        })
+        result = memory_commit(
+            cfg,
+            {
+                "key": "work.autokey",
+                "content": "auto written content",
+                "type": "note",
+                "scope": "global",
+                "weight": 0.5,
+                "reason": "unit test",
+            },
+        )
         assert result.get("status") == "applied"
         assert (vault / "work" / "autokey.md").exists()

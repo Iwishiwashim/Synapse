@@ -3,6 +3,7 @@ Live watcher test — requires a real Gemini API key in .env
 Tests the full loop: file change -> Gemma extraction -> vault patch applied
 Run: python test_watcher_live.py
 """
+
 import sys
 import time
 from pathlib import Path
@@ -81,6 +82,7 @@ else:
 
 # Cleanup test files
 import shutil
+
 shutil.rmtree(WATCH_DIR, ignore_errors=True)
 if project_dir.exists():
     shutil.rmtree(project_dir, ignore_errors=True)

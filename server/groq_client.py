@@ -1,4 +1,5 @@
 """Shared Groq client and extraction helper for Synapse."""
+
 from __future__ import annotations
 
 import itertools
@@ -36,6 +37,7 @@ def get_client(config: "SynapseConfig") -> Any:
         raise ValueError("groq_api_key required; set GROQ_API_KEY in .env")
     try:
         from groq import Groq
+
         return Groq(api_key=config.groq_api_key)
     except ImportError:
         raise ImportError("groq not installed (pip install groq)")
@@ -61,8 +63,11 @@ def groq_complete(client: Any, system: str, user: str, max_tokens: int = 4096) -
             if "rate limit" in msg or "429" in msg:
                 # Rotate to next model on rate limit; this hits a fresh RPM bucket.
                 model = _next_model()
-                wait = _RETRY_DELAY * (2 ** attempt)
-                print(f"[Groq] Rate limited; switching to {model}, retrying in {wait:.1f}s", flush=True)
+                wait = _RETRY_DELAY * (2**attempt)
+                print(
+                    f"[Groq] Rate limited; switching to {model}, retrying in {wait:.1f}s",
+                    flush=True,
+                )
                 time.sleep(wait)
             else:
                 raise
@@ -75,6 +80,7 @@ def best_complete(config: "SynapseConfig", system: str, user: str, max_tokens: i
     if getattr(config, "cerebras_api_key", ""):
         try:
             from .cerebras_client import get_client as _cb_get, cerebras_complete
+
             cb = _cb_get(config)
             if getattr(config, "groq_api_key", ""):
                 if not _cerebras_slots.acquire(blocking=False):
@@ -89,7 +95,9 @@ def best_complete(config: "SynapseConfig", system: str, user: str, max_tokens: i
                     finally:
                         _cerebras_slots.release()
 
-                thread = threading.Thread(target=_run_cerebras, daemon=True, name="synapse-cerebras-call")
+                thread = threading.Thread(
+                    target=_run_cerebras, daemon=True, name="synapse-cerebras-call"
+                )
                 thread.start()
                 try:
                     ok, result = result_queue.get(timeout=_CEREBRAS_WALL_TIMEOUT)
@@ -105,7 +113,10 @@ def best_complete(config: "SynapseConfig", system: str, user: str, max_tokens: i
             cerebras_error = exc
             if not getattr(config, "groq_api_key", ""):
                 raise
-            print(f"[Cerebras] Failed ({exc.__class__.__name__}: {exc}); falling back to Groq", flush=True)
+            print(
+                f"[Cerebras] Failed ({exc.__class__.__name__}: {exc}); falling back to Groq",
+                flush=True,
+            )
 
     if not getattr(config, "groq_api_key", "") and cerebras_error:
         raise cerebras_error

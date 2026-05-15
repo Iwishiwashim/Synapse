@@ -2,6 +2,7 @@
 Full end-to-end Synapse test — requires GEMINI_API_KEY in .env
 Covers every MCP tool. Run: python test_full.py
 """
+
 from __future__ import annotations
 
 import shutil
@@ -51,7 +52,9 @@ def section(title: str) -> None:
 cfg = load_config()
 print("Synapse full end-to-end test")
 print(f"Vault : {cfg.vault_path}")
-print(f"Key   : {cfg.gemini_api_key[:8]}...{cfg.gemini_api_key[-4:] if cfg.gemini_api_key else 'MISSING'}")
+print(
+    f"Key   : {cfg.gemini_api_key[:8]}...{cfg.gemini_api_key[-4:] if cfg.gemini_api_key else 'MISSING'}"
+)
 
 if not cfg.gemini_api_key:
     print("\nNo API key — run python setup.py first.")
@@ -138,7 +141,9 @@ organized = memory_organize_vault(cfg)
 check("status=organized", organized.get("status") == "organized")
 created = organized.get("indexes_created", [])
 updated = organized.get("indexes_updated", [])
-print(f"     indexes created={len(created)} updated={len(updated)} relinked={organized.get('files_relinked',0)}")
+print(
+    f"     indexes created={len(created)} updated={len(updated)} relinked={organized.get('files_relinked',0)}"
+)
 check("created or updated indexes", len(created) + len(updated) > 0)
 
 # verify index files exist on disk
@@ -176,7 +181,9 @@ with tempfile.TemporaryDirectory() as tmpdir:
     check("files_analyzed > 0", scan.get("files_analyzed", 0) > 0)
     patches_proposed = scan.get("patches_proposed", 0)
     fn_nodes = scan.get("function_nodes", 0)
-    print(f"     files={scan.get('files_analyzed')} patches={patches_proposed} fn_nodes={fn_nodes} stale_removed={scan.get('stale_removed',0)}")
+    print(
+        f"     files={scan.get('files_analyzed')} patches={patches_proposed} fn_nodes={fn_nodes} stale_removed={scan.get('stale_removed',0)}"
+    )
     check("patches proposed", patches_proposed > 0)
 
     # apply all scan patches
@@ -225,7 +232,9 @@ with tempfile.TemporaryDirectory() as tmpdir:
         s = memory_watcher_status()
         processed = s.get("processed", 0)
         err = s.get("last_error", "")
-        print(f"     processed={processed} queued={s.get('queued_files',[])} last_error={err or 'none'}")
+        print(
+            f"     processed={processed} queued={s.get('queued_files',[])} last_error={err or 'none'}"
+        )
         if processed > 0:
             break
 

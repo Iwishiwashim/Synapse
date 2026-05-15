@@ -13,21 +13,137 @@ CLAUDE_ANALYSIS_THRESHOLD = 0.7
 
 # Words that bias embedding toward the person rather than the topic
 _STOP_WORDS = {
-    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "may", "might", "shall", "can", "need", "dare", "ought",
-    "i", "me", "my", "we", "our", "you", "your", "he", "she", "it", "they",
-    "them", "their", "this", "that", "these", "those", "what", "which",
-    "who", "whom", "how", "why", "when", "where", "and", "or", "but",
-    "if", "then", "else", "so", "yet", "both", "either", "neither",
-    "not", "no", "nor", "just", "very", "also", "too", "only", "even",
-    "in", "on", "at", "to", "for", "of", "with", "by", "from", "up",
-    "about", "into", "through", "during", "before", "after", "above",
-    "below", "between", "out", "off", "over", "under", "again", "further",
-    "then", "once", "as", "than", "while", "since", "because", "although",
-    "does", "make", "makes", "made", "get", "gets", "got", "use", "used",
-    "using", "give", "gives", "gave", "take", "takes", "took", "come",
-    "goes", "went", "think", "feel", "know", "want", "like", "look", "see",
+    "a",
+    "an",
+    "the",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "shall",
+    "can",
+    "need",
+    "dare",
+    "ought",
+    "i",
+    "me",
+    "my",
+    "we",
+    "our",
+    "you",
+    "your",
+    "he",
+    "she",
+    "it",
+    "they",
+    "them",
+    "their",
+    "this",
+    "that",
+    "these",
+    "those",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "how",
+    "why",
+    "when",
+    "where",
+    "and",
+    "or",
+    "but",
+    "if",
+    "then",
+    "else",
+    "so",
+    "yet",
+    "both",
+    "either",
+    "neither",
+    "not",
+    "no",
+    "nor",
+    "just",
+    "very",
+    "also",
+    "too",
+    "only",
+    "even",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "with",
+    "by",
+    "from",
+    "up",
+    "about",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "between",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "as",
+    "than",
+    "while",
+    "since",
+    "because",
+    "although",
+    "does",
+    "make",
+    "makes",
+    "made",
+    "get",
+    "gets",
+    "got",
+    "use",
+    "used",
+    "using",
+    "give",
+    "gives",
+    "gave",
+    "take",
+    "takes",
+    "took",
+    "come",
+    "goes",
+    "went",
+    "think",
+    "feel",
+    "know",
+    "want",
+    "like",
+    "look",
+    "see",
     # add your own name(s) here so searches focus on topic, not person
 }
 
@@ -38,6 +154,7 @@ def _clean_query(query: str) -> str:
     kept = [w for w in words if w.strip(".,?!:;'\"") not in _STOP_WORDS]
     # Fall back to original if nothing survives (all stop words)
     return " ".join(kept) if kept else query
+
 
 _SYSTEM_PROMPT = """\
 You are a semantic memory router for a personal knowledge vault.
@@ -77,6 +194,7 @@ def memory_search(config: SynapseConfig, query: str) -> list[dict[str, Any]]:
     if config.gemini_api_key:
         try:
             from .embeddings import semantic_search
+
             sem_results = semantic_search(
                 config.vault_path / "_index.db",
                 config.gemini_api_key,
@@ -85,6 +203,7 @@ def memory_search(config: SynapseConfig, query: str) -> list[dict[str, Any]]:
             )
             if sem_results:
                 from .embeddings import hybrid_merge
+
                 fts_results = index.search(query)
                 # Only let FTS5 boost semantic results — never add FTS-only noise keys
                 sem_keys = {r["key"] for r in sem_results}
@@ -133,19 +252,19 @@ def _gemini_fallback(config: SynapseConfig, query: str) -> list[dict[str, Any]]:
         # fall back to direct index scan
         try:
             with index.connect() as conn:
-                rows = [dict(r) for r in conn.execute(
-                    "SELECT key, content_preview FROM memories ORDER BY key"
-                ).fetchall()]
+                rows = [
+                    dict(r)
+                    for r in conn.execute(
+                        "SELECT key, content_preview FROM memories ORDER BY key"
+                    ).fetchall()
+                ]
         except Exception:
             rows = []
 
     if not rows:
         return []
 
-    vault_lines = "\n".join(
-        f"- {r['key']}: {(r.get('content_preview') or '')[:200]}"
-        for r in rows
-    )
+    vault_lines = "\n".join(f"- {r['key']}: {(r.get('content_preview') or '')[:200]}" for r in rows)
     user_input = f"Query: {query}\n\nMemory keys and previews:\n{vault_lines}"
 
     client = genai.Client(api_key=config.gemini_api_key)
@@ -205,12 +324,14 @@ def _parse_response(raw: str, valid_keys: set[str]) -> list[dict[str, Any]]:
         if not key or key not in valid_keys:
             continue
         score = float(item.get("score", 0.0))
-        results.append({
-            "key": key,
-            "score": score,
-            "reason": str(item.get("reason", "")),
-            "source": "cloud",
-        })
+        results.append(
+            {
+                "key": key,
+                "score": score,
+                "reason": str(item.get("reason", "")),
+                "source": "cloud",
+            }
+        )
 
     results.sort(key=lambda x: -x["score"])
     return results[:5]

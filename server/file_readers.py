@@ -12,14 +12,15 @@ import io
 import json
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # PDF
 # ---------------------------------------------------------------------------
 
+
 def read_pdf(path: Path, max_chars: int = 12_000) -> str | None:
     try:
         from pypdf import PdfReader  # type: ignore
+
         reader = PdfReader(str(path))
         pages = []
         for page in reader.pages:
@@ -33,6 +34,7 @@ def read_pdf(path: Path, max_chars: int = 12_000) -> str | None:
 
     try:
         import pdfplumber  # type: ignore
+
         with pdfplumber.open(str(path)) as pdf:
             pages = []
             for page in pdf.pages:
@@ -49,9 +51,11 @@ def read_pdf(path: Path, max_chars: int = 12_000) -> str | None:
 # DOCX
 # ---------------------------------------------------------------------------
 
+
 def read_docx(path: Path, max_chars: int = 12_000) -> str | None:
     try:
         from docx import Document  # type: ignore
+
         doc = Document(str(path))
         lines = [p.text for p in doc.paragraphs if p.text.strip()]
         return "\n".join(lines)[:max_chars] or None
@@ -62,6 +66,7 @@ def read_docx(path: Path, max_chars: int = 12_000) -> str | None:
 # ---------------------------------------------------------------------------
 # CSV
 # ---------------------------------------------------------------------------
+
 
 def read_csv(path: Path, max_rows: int = 50) -> str | None:
     try:
@@ -94,6 +99,7 @@ def read_csv(path: Path, max_rows: int = 50) -> str | None:
 # Jupyter Notebook (.ipynb)
 # ---------------------------------------------------------------------------
 
+
 def read_ipynb(path: Path, max_chars: int = 12_000) -> str | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
@@ -115,7 +121,9 @@ def read_ipynb(path: Path, max_chars: int = 12_000) -> str | None:
             # include text outputs (skip images)
             for output in cell.get("outputs", []):
                 if output.get("output_type") in ("stream", "execute_result"):
-                    text = "".join(output.get("text", []) or output.get("data", {}).get("text/plain", []))
+                    text = "".join(
+                        output.get("text", []) or output.get("data", {}).get("text/plain", [])
+                    )
                     if text.strip():
                         parts.append(f"Output:\n{text[:500]}")
         parts.append("")
@@ -126,6 +134,7 @@ def read_ipynb(path: Path, max_chars: int = 12_000) -> str | None:
 # ---------------------------------------------------------------------------
 # HTML
 # ---------------------------------------------------------------------------
+
 
 class _HTMLStripper(html.parser.HTMLParser):
     _SKIP_TAGS = {"script", "style", "head", "meta", "link"}
@@ -164,12 +173,12 @@ def read_html(path: Path, max_chars: int = 12_000) -> str | None:
 # ---------------------------------------------------------------------------
 
 _READERS = {
-    ".pdf":   read_pdf,
-    ".docx":  read_docx,
-    ".csv":   read_csv,
+    ".pdf": read_pdf,
+    ".docx": read_docx,
+    ".csv": read_csv,
     ".ipynb": read_ipynb,
-    ".html":  read_html,
-    ".htm":   read_html,
+    ".html": read_html,
+    ".htm": read_html,
 }
 
 SUPPORTED_EXTENSIONS: set[str] = set(_READERS)

@@ -12,11 +12,11 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from groq import Groq
 from openai import OpenAI
-
 
 # ============================================================
 # SYNAPSE FINAL AI SENDER
@@ -176,6 +176,7 @@ cerebras_client = OpenAI(
 if GEMINI_API_KEY:
     from google import genai as _genai
     from google.genai import types as _gtypes
+
     gemma_client = _genai.Client(api_key=GEMINI_API_KEY)
 else:
     gemma_client = None
@@ -184,6 +185,7 @@ else:
 # ============================================================
 # BLACKLIST
 # ============================================================
+
 
 def load_blacklist():
     ids = set()
@@ -281,6 +283,7 @@ Rules:
 # LOAD DATA
 # ============================================================
 
+
 def load_extracted_conversations(filtered_folder):
     folder = Path(filtered_folder)
 
@@ -311,6 +314,7 @@ def load_extracted_conversations(filtered_folder):
 # ============================================================
 # OUTPUT HELPERS
 # ============================================================
+
 
 def safe_id(conversation_id):
     return str(conversation_id).replace("/", "_").replace("\\", "_")
@@ -359,6 +363,7 @@ def save_error(output_folder, conversation, provider, error):
 # JSON PARSING
 # ============================================================
 
+
 def clean_json_text(raw):
     text = str(raw).strip()
 
@@ -375,7 +380,7 @@ def clean_json_text(raw):
     last = text.rfind("}")
 
     if first != -1 and last != -1 and last > first:
-        text = text[first:last + 1]
+        text = text[first : last + 1]
 
     return text
 
@@ -419,6 +424,7 @@ def safe_json_parse(raw, conversation_id, title, provider, model):
 # ============================================================
 # ERROR / RATE-LIMIT HANDLING
 # ============================================================
+
 
 def get_response_headers(error):
     response = getattr(error, "response", None)
@@ -563,6 +569,7 @@ def get_wait_seconds(error):
 # CHUNKING
 # ============================================================
 
+
 def split_text_into_chunks(text, max_chars):
     chunks = []
     start = 0
@@ -599,6 +606,7 @@ def split_text_into_chunks(text, max_chars):
 
 _GEMMA_FALLBACK_MODEL = "gemma-4-26b-a4b-it"
 
+
 def _gemma_generate(system, user):
     """Call Gemma via the Gemini API, return raw text. Falls back to smaller model on 503."""
     contents = [
@@ -609,7 +617,9 @@ def _gemma_generate(system, user):
     for model in [GEMMA_MODEL, _GEMMA_FALLBACK_MODEL]:
         try:
             chunks = []
-            for chunk in gemma_client.models.generate_content_stream(model=model, contents=contents):
+            for chunk in gemma_client.models.generate_content_stream(
+                model=model, contents=contents
+            ):
                 if chunk.text:
                     chunks.append(chunk.text)
             return "".join(chunks)
@@ -671,7 +681,9 @@ def summarize_with_gemma(conversation):
     chunk_summaries = []
     for idx, chunk in enumerate(chunks, start=1):
         print(f"  Gemma chunk {idx}/{len(chunks)} ({len(chunk):,} chars)")
-        chunk_summaries.append(summarize_gemma_chunk(conversation_id, title, chunk, idx, len(chunks)))
+        chunk_summaries.append(
+            summarize_gemma_chunk(conversation_id, title, chunk, idx, len(chunks))
+        )
         time.sleep(1)
     return merge_gemma_chunk_summaries(conversation_id, title, chunk_summaries)
 
@@ -679,6 +691,7 @@ def summarize_with_gemma(conversation):
 # ============================================================
 # GROQ
 # ============================================================
+
 
 def summarize_with_groq_oneshot(conversation):
     conversation_id = conversation.get("conversation_id", "unknown-id")
@@ -947,6 +960,7 @@ def summarize_with_groq(conversation):
 # CEREBRAS FALLBACK
 # ============================================================
 
+
 def summarize_cerebras_chunk(conversation_id, title, chunk_text, chunk_index, total_chunks):
     response = cerebras_client.chat.completions.create(
         model=CEREBRAS_MODEL,
@@ -1090,6 +1104,7 @@ def call_cerebras_chunk_with_retries(conversation_id, title, chunk, idx, total_c
                 print(f"Waiting {wait}s...")
                 time.sleep(wait)
 
+
 def summarize_with_cerebras_chunked(conversation):
     conversation_id = conversation.get("conversation_id", "unknown-id")
     title = conversation.get("title", "Untitled Conversation")
@@ -1134,7 +1149,9 @@ def summarize_with_cerebras_chunked(conversation):
         except Exception as e:
             if is_context_error(e):
                 current_chunk_limit = int(current_chunk_limit * CEREBRAS_CHUNK_SHRINK_FACTOR)
-                print(f"Cerebras whole pass context issue. Retrying with chunk size {current_chunk_limit:,}...")
+                print(
+                    f"Cerebras whole pass context issue. Retrying with chunk size {current_chunk_limit:,}..."
+                )
                 continue
 
             raise
@@ -1145,6 +1162,7 @@ def summarize_with_cerebras_chunked(conversation):
 # ============================================================
 # OPENROUTER
 # ============================================================
+
 
 def summarize_openrouter_text(conversation_id, title, text, max_tokens=4096):
     response = openrouter_client.chat.completions.create(
@@ -1343,6 +1361,7 @@ def summarize_with_openrouter(conversation):
 # RETRY WRAPPER
 # ============================================================
 
+
 def call_with_retries(provider, conversation):
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -1403,7 +1422,9 @@ def call_with_retries(provider, conversation):
                 return summarize_with_groq_chunked(conversation)
 
             if is_context_error(e):
-                print("Context-length error detected. Not waiting because waiting will not fix message length.")
+                print(
+                    "Context-length error detected. Not waiting because waiting will not fix message length."
+                )
                 raise
 
             if is_rate_limit_error(e):
@@ -1434,6 +1455,7 @@ def call_with_retries(provider, conversation):
 # ============================================================
 # QUEUES
 # ============================================================
+
 
 def build_queues(conversations, output_folder):
     ranked = sorted(conversations, key=lambda x: x.get("clean_chars", 0), reverse=True)
@@ -1551,6 +1573,7 @@ def build_full_items(groq_queue, openrouter_jobs_this_run):
 # PROCESSING
 # ============================================================
 
+
 def process_one(provider, conversation, output_folder, all_summaries_path, index, total):
     conversation_id = conversation.get("conversation_id", "unknown-id")
     title = conversation.get("title", "Untitled Conversation")
@@ -1630,10 +1653,7 @@ def process_groq_parallel(groq_items, output_folder, all_summaries_path):
     ]
 
     with ThreadPoolExecutor(max_workers=GROQ_WORKERS) as executor:
-        future_to_job = {
-            executor.submit(worker, job): job
-            for job in jobs
-        }
+        future_to_job = {executor.submit(worker, job): job for job in jobs}
 
         for future in as_completed(future_to_job):
             try:
@@ -1740,7 +1760,9 @@ def main():
                 skipped += 1
             else:
                 errors += 1
-            print(f"Progress: {success+skipped+errors}/{total} | Success: {success} | Skipped: {skipped} | Errors: {errors}")
+            print(
+                f"Progress: {success+skipped+errors}/{total} | Success: {success} | Skipped: {skipped} | Errors: {errors}"
+            )
 
     print("\n" + "=" * 100)
     print("RUN COMPLETE")

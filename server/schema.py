@@ -6,7 +6,9 @@ from typing import Any
 from .memory_file import CONFIDENCE_VALUES, REQUIRED_FIELDS, parse_memory_text, path_to_key
 
 
-def validate_memory(frontmatter: dict[str, Any], content: str, path: Path | None = None, vault: Path | None = None) -> list[str]:
+def validate_memory(
+    frontmatter: dict[str, Any], content: str, path: Path | None = None, vault: Path | None = None
+) -> list[str]:
     errors: list[str] = []
     missing = sorted(REQUIRED_FIELDS - set(frontmatter))
     if missing:

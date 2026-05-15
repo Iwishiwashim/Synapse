@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 from groq import Groq
 
-
 # ============================================================
 # GROQ BLACKLIST FROM REDFLAG TXT
 #
@@ -112,6 +111,7 @@ Important:
 # HELPERS
 # ============================================================
 
+
 def clean_json_text(raw):
     text = str(raw).strip()
 
@@ -128,7 +128,7 @@ def clean_json_text(raw):
     last = text.rfind("}")
 
     if first != -1 and last != -1 and last > first:
-        text = text[first:last + 1]
+        text = text[first : last + 1]
 
     return text
 
@@ -178,7 +178,7 @@ def load_redflag_lines():
         # Keep only lines that begin with a UUID.
         if re.match(
             r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\s*\|",
-            line
+            line,
         ):
             lines.append(line)
 
@@ -219,6 +219,7 @@ def decision_path(chunk_index):
 # ============================================================
 # GROQ REVIEW
 # ============================================================
+
 
 def review_chunk_with_groq(chunk, chunk_index, total_chunks):
     path = decision_path(chunk_index)
@@ -261,10 +262,7 @@ def review_chunk_with_groq(chunk, chunk_index, total_chunks):
             parsed["provider_used"] = "groq"
             parsed["model_used"] = GROQ_MODEL
 
-            path.write_text(
-                json.dumps(parsed, ensure_ascii=False, indent=2),
-                encoding="utf-8"
-            )
+            path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
 
             return parsed
 
@@ -291,6 +289,7 @@ def review_chunk_with_groq(chunk, chunk_index, total_chunks):
 # OUTPUT
 # ============================================================
 
+
 def write_outputs(all_decisions):
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
@@ -310,19 +309,14 @@ def write_outputs(all_decisions):
     blacklist_ids = sorted({d["conversation_id"] for d in blacklist})
     not_blacklisted_ids = sorted({d["conversation_id"] for d in not_blacklisted})
 
-    (OUTPUT_FOLDER / "blacklist_ids.txt").write_text(
-        "\n".join(blacklist_ids),
-        encoding="utf-8"
-    )
+    (OUTPUT_FOLDER / "blacklist_ids.txt").write_text("\n".join(blacklist_ids), encoding="utf-8")
 
     (OUTPUT_FOLDER / "not_blacklisted_ids.txt").write_text(
-        "\n".join(not_blacklisted_ids),
-        encoding="utf-8"
+        "\n".join(not_blacklisted_ids), encoding="utf-8"
     )
 
     (OUTPUT_FOLDER / "all_groq_blacklist_decisions.json").write_text(
-        json.dumps(all_decisions, ensure_ascii=False, indent=2),
-        encoding="utf-8"
+        json.dumps(all_decisions, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
     summary = {
@@ -334,8 +328,7 @@ def write_outputs(all_decisions):
     }
 
     (OUTPUT_FOLDER / "summary.json").write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2),
-        encoding="utf-8"
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
     print("\nRESULTS")
@@ -351,6 +344,7 @@ def write_outputs(all_decisions):
 # ============================================================
 # MAIN
 # ============================================================
+
 
 def main():
     OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,7 @@ Parses Python (AST) and TypeScript/JS (regex) to produce:
   - edges: contains | imports_from | calls | exports
 No LLM required. Pure static analysis.
 """
+
 from __future__ import annotations
 
 import ast
@@ -13,10 +14,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def extract_code_graph(files: dict[str, str]) -> dict[str, Any]:
     """
@@ -34,7 +35,9 @@ def extract_code_graph(files: dict[str, str]) -> dict[str, Any]:
     for rel_path, content in files.items():
         file_id = path_to_node_id(rel_path)
         if file_id not in node_ids:
-            nodes.append({"id": file_id, "label": Path(rel_path).name, "file": rel_path, "type": "file"})
+            nodes.append(
+                {"id": file_id, "label": Path(rel_path).name, "file": rel_path, "type": "file"}
+            )
             node_ids.add(file_id)
 
         ext = Path(rel_path).suffix.lower()
@@ -49,7 +52,8 @@ def extract_code_graph(files: dict[str, str]) -> dict[str, Any]:
     # Filter: keep call edges only where both endpoints exist (reduces external-lib noise)
     # Keep all other edge types (imports_from, contains, exports) regardless
     edges = [
-        e for e in edges
+        e
+        for e in edges
         if e["relation"] != "calls" or (e["source"] in known_ids and e["target"] in known_ids)
     ]
 
@@ -103,9 +107,14 @@ def related_file_ids(graph: dict[str, Any], file_id: str, limit: int = 5) -> lis
 # Python extractor (AST-based)
 # ---------------------------------------------------------------------------
 
+
 def _extract_python(
-    file_id: str, rel_path: str, content: str,
-    nodes: list, edges: list, node_ids: set,
+    file_id: str,
+    rel_path: str,
+    content: str,
+    nodes: list,
+    edges: list,
+    node_ids: set,
 ) -> None:
     try:
         tree = ast.parse(content, filename=rel_path)
@@ -130,18 +139,20 @@ def _extract_python(
                 sig = _py_signature(node)
                 doc = ast.get_docstring(node) or ""
                 source = _get_source(content, node)
-                nodes.append({
-                    "id": fn_id,
-                    "label": f"{node.name}()",
-                    "file": rel_path,
-                    "type": "function",
-                    "parent": file_id,
-                    "signature": sig,
-                    "docstring": doc[:200],
-                    "source": source,
-                    "lineno": node.lineno,
-                    "lineno_end": getattr(node, "end_lineno", node.lineno),
-                })
+                nodes.append(
+                    {
+                        "id": fn_id,
+                        "label": f"{node.name}()",
+                        "file": rel_path,
+                        "type": "function",
+                        "parent": file_id,
+                        "signature": sig,
+                        "docstring": doc[:200],
+                        "source": source,
+                        "lineno": node.lineno,
+                        "lineno_end": getattr(node, "end_lineno", node.lineno),
+                    }
+                )
                 node_ids.add(fn_id)
                 edges.append({"source": file_id, "target": fn_id, "relation": "contains"})
 
@@ -152,23 +163,27 @@ def _extract_python(
                     if isinstance(child, ast.Call):
                         called_id = _resolve_call(child, file_id)
                         if called_id and called_id != fn_id:
-                            edges.append({"source": fn_id, "target": called_id, "relation": "calls"})
+                            edges.append(
+                                {"source": fn_id, "target": called_id, "relation": "calls"}
+                            )
 
         elif isinstance(node, ast.ClassDef):
             cls_slug = _name_to_slug(node.name)
             cls_id = f"{file_id}-{cls_slug}"
             if cls_id not in node_ids:
                 source = _get_source(content, node)
-                nodes.append({
-                    "id": cls_id,
-                    "label": node.name,
-                    "file": rel_path,
-                    "type": "class",
-                    "parent": file_id,
-                    "source": source[:1500],
-                    "lineno": node.lineno,
-                    "lineno_end": getattr(node, "end_lineno", node.lineno),
-                })
+                nodes.append(
+                    {
+                        "id": cls_id,
+                        "label": node.name,
+                        "file": rel_path,
+                        "type": "class",
+                        "parent": file_id,
+                        "source": source[:1500],
+                        "lineno": node.lineno,
+                        "lineno_end": getattr(node, "end_lineno", node.lineno),
+                    }
+                )
                 node_ids.add(cls_id)
                 edges.append({"source": file_id, "target": cls_id, "relation": "contains"})
 
@@ -243,12 +258,40 @@ _TS_CALL = re.compile(r"""(?<!\w)(\w+)\s*\(""")
 
 
 def _extract_typescript(
-    file_id: str, rel_path: str, content: str,
-    nodes: list, edges: list, node_ids: set,
+    file_id: str,
+    rel_path: str,
+    content: str,
+    nodes: list,
+    edges: list,
+    node_ids: set,
 ) -> None:
-    _SKIP_KW = {"if", "for", "while", "switch", "catch", "return", "typeof", "instanceof",
-                "new", "delete", "void", "throw", "case", "in", "of", "from", "import",
-                "export", "class", "function", "async", "await", "yield", "super", "this"}
+    _SKIP_KW = {
+        "if",
+        "for",
+        "while",
+        "switch",
+        "catch",
+        "return",
+        "typeof",
+        "instanceof",
+        "new",
+        "delete",
+        "void",
+        "throw",
+        "case",
+        "in",
+        "of",
+        "from",
+        "import",
+        "export",
+        "class",
+        "function",
+        "async",
+        "await",
+        "yield",
+        "super",
+        "this",
+    }
 
     # --- imports ---
     for pattern in (_TS_IMPORT, _TS_REQUIRE):
@@ -263,29 +306,33 @@ def _extract_typescript(
         fn_name = m.group(1)
         if fn_name in _SKIP_KW:
             continue
-        _add_ts_node(file_id, rel_path, content, fn_name, "function", m.start(),
-                     nodes, edges, node_ids)
+        _add_ts_node(
+            file_id, rel_path, content, fn_name, "function", m.start(), nodes, edges, node_ids
+        )
 
     # --- default export function ---
     for m in _TS_DEFAULT_FN.finditer(content):
         fn_name = m.group(1)
         if fn_name not in _SKIP_KW:
-            _add_ts_node(file_id, rel_path, content, fn_name, "function", m.start(),
-                         nodes, edges, node_ids)
+            _add_ts_node(
+                file_id, rel_path, content, fn_name, "function", m.start(), nodes, edges, node_ids
+            )
 
     # --- arrow / const exports ---
     for m in _TS_ARROW.finditer(content):
         name = m.group(1)
         if name not in _SKIP_KW:
-            _add_ts_node(file_id, rel_path, content, name, "function", m.start(),
-                         nodes, edges, node_ids)
+            _add_ts_node(
+                file_id, rel_path, content, name, "function", m.start(), nodes, edges, node_ids
+            )
 
     # --- classes ---
     for m in _TS_CLASS.finditer(content):
         cls_name = m.group(1)
         if cls_name not in _SKIP_KW:
-            _add_ts_node(file_id, rel_path, content, cls_name, "class", m.start(),
-                         nodes, edges, node_ids)
+            _add_ts_node(
+                file_id, rel_path, content, cls_name, "class", m.start(), nodes, edges, node_ids
+            )
 
     # --- call edges (best-effort) ---
     known_fns = {n["id"] for n in nodes if n.get("parent") == file_id}
@@ -301,9 +348,15 @@ def _extract_typescript(
 
 
 def _add_ts_node(
-    file_id: str, rel_path: str, content: str,
-    name: str, ntype: str, pos: int,
-    nodes: list, edges: list, node_ids: set,
+    file_id: str,
+    rel_path: str,
+    content: str,
+    name: str,
+    ntype: str,
+    pos: int,
+    nodes: list,
+    edges: list,
+    node_ids: set,
 ) -> None:
     slug = _name_to_slug(name)
     node_id = f"{file_id}-{slug}"
@@ -312,17 +365,19 @@ def _add_ts_node(
     lineno = content[:pos].count("\n") + 1
     # Extract approximate body: from this position to end of next matching brace block
     body = _extract_ts_body(content, pos)
-    nodes.append({
-        "id": node_id,
-        "label": f"{name}()" if ntype == "function" else name,
-        "file": rel_path,
-        "type": ntype,
-        "parent": file_id,
-        "source": body[:3000],
-        "lineno": lineno,
-    })
+    nodes.append(
+        {
+            "id": node_id,
+            "label": f"{name}()" if ntype == "function" else name,
+            "file": rel_path,
+            "type": ntype,
+            "parent": file_id,
+            "source": body[:3000],
+            "lineno": lineno,
+        }
+    )
     node_ids.add(node_id)
-    relation = "exports" if "export" in content[max(0, pos - 10):pos + 10] else "contains"
+    relation = "exports" if "export" in content[max(0, pos - 10) : pos + 10] else "contains"
     edges.append({"source": file_id, "target": node_id, "relation": relation})
 
 
@@ -330,7 +385,7 @@ def _extract_ts_body(content: str, start: int) -> str:
     """Find the opening brace after start and extract the balanced block."""
     brace_start = content.find("{", start)
     if brace_start == -1:
-        return content[start:start + 500]
+        return content[start : start + 500]
     depth = 0
     for i in range(brace_start, min(len(content), brace_start + 8000)):
         if content[i] == "{":
@@ -338,5 +393,5 @@ def _extract_ts_body(content: str, start: int) -> str:
         elif content[i] == "}":
             depth -= 1
             if depth == 0:
-                return content[start:i + 1]
-    return content[start:brace_start + 500]
+                return content[start : i + 1]
+    return content[start : brace_start + 500]

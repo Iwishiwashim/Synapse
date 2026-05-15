@@ -48,6 +48,7 @@ from .functions import (
 )
 from .weekly_report import generate_weekly_report
 
+
 def _load_agent_instructions() -> str:
     here = Path(__file__).parent.parent
     md = here / "AGENT.md"
@@ -149,9 +150,20 @@ def import_ai_export(path: str, owner_name: str = "", resume_failed: bool = Fals
 
 
 @app.tool(name="memory_import_filtered_jsonl")
-def import_filtered_jsonl(filtered_jsonl_folder: str, blacklist_file: str = "", redflag_file: str = "", owner_name: str = "") -> dict:
+def import_filtered_jsonl(
+    filtered_jsonl_folder: str,
+    blacklist_file: str = "",
+    redflag_file: str = "",
+    owner_name: str = "",
+) -> dict:
     """Import pre-filtered ChatGPT conversations using Gemma (Gemini API). Skips any conversation ID in the blacklist or redflag file. Requires gemini_api_key in config."""
-    return memory_import_filtered_jsonl(config, filtered_jsonl_folder, blacklist_file or None, redflag_file or None, owner_name or None)
+    return memory_import_filtered_jsonl(
+        config,
+        filtered_jsonl_folder,
+        blacklist_file or None,
+        redflag_file or None,
+        owner_name or None,
+    )
 
 
 @app.tool(name="memory_import_synapse_summaries")
@@ -257,7 +269,12 @@ def save_chat(
 ) -> dict:
     """Save the current conversation as a chat summary in vault/chats/. Call this at the end of any session worth remembering. The result is immediately searchable via memory_deep_search and memory_search. Run memory_build_graph afterward to wire it into the topic graph."""
     return memory_save_chat(
-        config, title, summary, key_facts, decisions, tags,
+        config,
+        title,
+        summary,
+        key_facts,
+        decisions,
+        tags,
         keywords=keywords,
         categories=categories or None,
         chat_id=chat_id or None,

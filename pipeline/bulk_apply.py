@@ -1,7 +1,9 @@
 """
 Bulk apply all pending patches, merging duplicates by key.
 """
+
 import sys
+
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, ".")
 

@@ -26,31 +26,136 @@ from .schema import validate_memory
 SENSITIVITY_VALUES = {"low", "medium", "high"}
 
 _STOPWORDS = {
-    "this", "that", "with", "from", "have", "will", "been", "were", "they",
-    "their", "what", "when", "where", "which", "there", "these", "those",
-    "also", "only", "just", "like", "into", "than", "then", "more", "some",
-    "each", "does", "would", "could", "should", "about", "after", "before",
-    "every", "never", "always", "added", "used", "uses", "using", "built",
-    "runs", "call", "calls", "return", "returns", "function", "import",
-    "export", "class", "const", "async", "await", "history", "initial",
-    "entry", "sample", "current", "updated", "update", "imported", "approved",
-    "memory", "file", "code", "note", "step", "test", "true", "false",
-    "null", "none", "type", "list", "dict", "string", "value", "data",
-    "path", "name", "user", "local", "global", "default", "config",
+    "this",
+    "that",
+    "with",
+    "from",
+    "have",
+    "will",
+    "been",
+    "were",
+    "they",
+    "their",
+    "what",
+    "when",
+    "where",
+    "which",
+    "there",
+    "these",
+    "those",
+    "also",
+    "only",
+    "just",
+    "like",
+    "into",
+    "than",
+    "then",
+    "more",
+    "some",
+    "each",
+    "does",
+    "would",
+    "could",
+    "should",
+    "about",
+    "after",
+    "before",
+    "every",
+    "never",
+    "always",
+    "added",
+    "used",
+    "uses",
+    "using",
+    "built",
+    "runs",
+    "call",
+    "calls",
+    "return",
+    "returns",
+    "function",
+    "import",
+    "export",
+    "class",
+    "const",
+    "async",
+    "await",
+    "history",
+    "initial",
+    "entry",
+    "sample",
+    "current",
+    "updated",
+    "update",
+    "imported",
+    "approved",
+    "memory",
+    "file",
+    "code",
+    "note",
+    "step",
+    "test",
+    "true",
+    "false",
+    "null",
+    "none",
+    "type",
+    "list",
+    "dict",
+    "string",
+    "value",
+    "data",
+    "path",
+    "name",
+    "user",
+    "local",
+    "global",
+    "default",
+    "config",
     # noise words that appear frequently but carry no signal
-    "across", "inferred", "server", "client", "available", "project",
-    "projects", "pattern", "patterns", "version", "same", "both", "kept",
-    "known", "means", "keeps", "runs", "sends", "makes", "lives", "stay",
-    "install", "installed", "notes", "note", "existing", "final", "state",
-    "intended", "intended", "named", "daily", "primary", "main", "between",
+    "across",
+    "inferred",
+    "server",
+    "client",
+    "available",
+    "project",
+    "projects",
+    "pattern",
+    "patterns",
+    "version",
+    "same",
+    "both",
+    "kept",
+    "known",
+    "means",
+    "keeps",
+    "runs",
+    "sends",
+    "makes",
+    "lives",
+    "stay",
+    "install",
+    "installed",
+    "notes",
+    "note",
+    "existing",
+    "final",
+    "state",
+    "intended",
+    "intended",
+    "named",
+    "daily",
+    "primary",
+    "main",
+    "between",
 }
 
 
 def _extract_triggers(content: str) -> list[str]:
     # Strip markdown code spans and filenames before extracting
-    cleaned = re.sub(r"`[^`]+`", " ", content)          # strip `code spans`
-    cleaned = re.sub(r"\S+\.\w{2,4}\b", " ", cleaned)   # strip file.ext tokens
-    cleaned = re.sub(r"https?://\S+", " ", cleaned)      # strip URLs
+    cleaned = re.sub(r"`[^`]+`", " ", content)  # strip `code spans`
+    cleaned = re.sub(r"\S+\.\w{2,4}\b", " ", cleaned)  # strip file.ext tokens
+    cleaned = re.sub(r"https?://\S+", " ", cleaned)  # strip URLs
     words = re.findall(r"\b[a-zA-Z][a-zA-Z0-9+#-]*\b", cleaned)
     freq: dict[str, int] = {}
     for w in words:
@@ -69,6 +174,7 @@ def _load_project_graph(vault_path: Path, key: str) -> dict | None:
         return None
     try:
         import json as _json
+
         return _json.loads(graph_path.read_text(encoding="utf-8"))
     except Exception:
         return None
@@ -105,7 +211,9 @@ def _compute_related(vault_path: Path, current_key: str, triggers: list[str]) ->
         return []
 
 
-def _refresh_related(config: SynapseConfig, path: Path, index: MemoryIndex, force: bool = False) -> None:
+def _refresh_related(
+    config: SynapseConfig, path: Path, index: MemoryIndex, force: bool = False
+) -> None:
     """Recompute triggers and related links for a memory file."""
     try:
         frontmatter, content = read_memory_file(path)
@@ -186,7 +294,11 @@ def propose_update(config: SynapseConfig, patch: dict[str, Any]) -> dict[str, An
     queue = load_pending(config)
     queue.append(item)
     save_pending(config, queue)
-    return {"patch_id": patch_id, "diff": item["diff"], "conflicts": detect_conflicts(config, after_patch=item)}
+    return {
+        "patch_id": patch_id,
+        "diff": item["diff"],
+        "conflicts": detect_conflicts(config, after_patch=item),
+    }
 
 
 def apply_update(config: SynapseConfig, patch_id: str) -> dict[str, Any]:
@@ -204,7 +316,11 @@ def apply_update(config: SynapseConfig, patch_id: str) -> dict[str, Any]:
 
     queue = [patch for patch in queue if patch["patch_id"] != patch_id]
     save_pending(config, queue)
-    git = commit_paths(config, [path, pending_path(config), config.vault_path / "_index.db"], f"Synapse memory update: {item['key']}")
+    git = commit_paths(
+        config,
+        [path, pending_path(config), config.vault_path / "_index.db"],
+        f"Synapse memory update: {item['key']}",
+    )
     return {
         "status": "applied",
         "patch_id": patch_id,
@@ -221,7 +337,12 @@ def reject_update(config: SynapseConfig, patch_id: str, reason: str = "") -> dic
         raise ValueError(f"Patch not found: {patch_id}")
     rejected = _rejection_log_path(config)
     with rejected.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps({"rejected_at": _now(), "patch_id": patch_id, "key": item["key"], "reason": reason}) + "\n")
+        handle.write(
+            json.dumps(
+                {"rejected_at": _now(), "patch_id": patch_id, "key": item["key"], "reason": reason}
+            )
+            + "\n"
+        )
     queue = [patch for patch in queue if patch["patch_id"] != patch_id]
     save_pending(config, queue)
     return {"status": "rejected", "patch_id": patch_id, "key": item["key"]}
@@ -242,7 +363,9 @@ def list_pending(config: SynapseConfig) -> list[dict[str, Any]]:
     ]
 
 
-def detect_conflicts(config: SynapseConfig, after_patch: dict[str, Any] | None = None) -> list[dict[str, str]]:
+def detect_conflicts(
+    config: SynapseConfig, after_patch: dict[str, Any] | None = None
+) -> list[dict[str, str]]:
     memories: list[dict[str, str]] = []
     for path in sorted(config.vault_path.rglob("*.md")):
         if path.name.startswith("_"):
@@ -258,11 +381,15 @@ def detect_conflicts(config: SynapseConfig, after_patch: dict[str, Any] | None =
         for right in memories[i + 1 :]:
             explanation = _conflict_explanation(left["content"], right["content"])
             if explanation:
-                conflicts.append({"left": left["key"], "right": right["key"], "explanation": explanation})
+                conflicts.append(
+                    {"left": left["key"], "right": right["key"], "explanation": explanation}
+                )
     return conflicts
 
 
-def cleanup_stale_nodes(config: SynapseConfig, project_slug: str, graph: dict[str, Any]) -> dict[str, Any]:
+def cleanup_stale_nodes(
+    config: SynapseConfig, project_slug: str, graph: dict[str, Any]
+) -> dict[str, Any]:
     """
     Remove vault nodes that no longer exist in the current code graph.
     Only touches files that were actually scanned — leaves unscanned files alone.
@@ -289,7 +416,7 @@ def cleanup_stale_nodes(config: SynapseConfig, project_slug: str, graph: dict[st
             expected_fn_slugs.setdefault(node_id, set())
         elif ntype in ("function", "class"):
             file_id = node.get("parent", "")
-            fn_slug = node_id[len(file_id) + 1:] if node_id.startswith(file_id + "-") else node_id
+            fn_slug = node_id[len(file_id) + 1 :] if node_id.startswith(file_id + "-") else node_id
             expected_fn_slugs.setdefault(file_id, set()).add(fn_slug)
 
     removed: list[str] = []
@@ -371,7 +498,12 @@ def _build_after_text(config: SynapseConfig, patch: dict[str, Any]) -> str:
         )
         frontmatter.update(patch.get("frontmatter", {}))
         content = str(patch.get("content", "")).strip()
-    _GENERIC_REASONS = {"High-signal memory moment.", "Approved memory update.", "Repeated casual-session pattern.", "Manual remember-this request."}
+    _GENERIC_REASONS = {
+        "High-signal memory moment.",
+        "Approved memory update.",
+        "Repeated casual-session pattern.",
+        "Manual remember-this request.",
+    }
     history = str(patch.get("history") or patch.get("reason") or "")
     if history and history not in _GENERIC_REASONS:
         content = ensure_history_entry(content, history)
@@ -388,7 +520,9 @@ def _normalize_write_rules(patch: dict[str, Any]) -> dict[str, Any]:
     if signal == "casual":
         occurrences = int(patch.get("session_occurrences", 1))
         if occurrences < 2:
-            raise ValueError("Casual chat proposals require the pattern to appear 2+ times in session")
+            raise ValueError(
+                "Casual chat proposals require the pattern to appear 2+ times in session"
+            )
         patch["sensitivity"] = "low"
         patch.setdefault("reason", "Repeated casual-session pattern.")
     elif signal in {"manual", "manual_flag", "remember"}:

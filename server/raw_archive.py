@@ -4,6 +4,7 @@ Raw conversation lookup via synapse_extracted/index/conversations_index.json.
 Provides O(1) UUID → markdown path resolution, full-text retrieval,
 and query-guided chunk extraction to keep token cost low.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,12 +19,53 @@ from .config import SynapseConfig
 _MSG_SEP = "-" * 100
 
 _STOP_WORDS = {
-    "the", "and", "for", "with", "that", "this", "from", "are", "was",
-    "were", "has", "have", "had", "not", "but", "can", "its", "user",
-    "also", "will", "been", "they", "their", "more", "used", "use",
-    "using", "about", "into", "when", "which", "some", "than", "then",
-    "one", "all", "any", "each", "both", "only", "very", "just", "chatgpt",
-    "content", "type", "text", "node",
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "from",
+    "are",
+    "was",
+    "were",
+    "has",
+    "have",
+    "had",
+    "not",
+    "but",
+    "can",
+    "its",
+    "user",
+    "also",
+    "will",
+    "been",
+    "they",
+    "their",
+    "more",
+    "used",
+    "use",
+    "using",
+    "about",
+    "into",
+    "when",
+    "which",
+    "some",
+    "than",
+    "then",
+    "one",
+    "all",
+    "any",
+    "each",
+    "both",
+    "only",
+    "very",
+    "just",
+    "chatgpt",
+    "content",
+    "type",
+    "text",
+    "node",
 }
 
 # Lines that are pure export metadata — strip before returning chunks
@@ -44,6 +86,7 @@ def _clean_message(msg: str) -> str:
 # ---------------------------------------------------------------------------
 # Index helpers
 # ---------------------------------------------------------------------------
+
 
 def _index_path(config: SynapseConfig) -> Path | None:
     if not config.raw_archive_path:
@@ -70,7 +113,10 @@ def _resolve(config: SynapseConfig, chat_id: str) -> tuple[dict | None, str | No
     cid = chat_id.removeprefix("chats.")
     index = _get_index(config)
     if index is None:
-        return None, "raw_archive_path not configured or index not found. Set raw_archive_path in config.yaml."
+        return (
+            None,
+            "raw_archive_path not configured or index not found. Set raw_archive_path in config.yaml.",
+        )
     entry = index.get(cid)
     if not entry:
         return None, f"Conversation {cid!r} not found in raw archive index."
@@ -80,6 +126,7 @@ def _resolve(config: SynapseConfig, chat_id: str) -> tuple[dict | None, str | No
 # ---------------------------------------------------------------------------
 # Chunking
 # ---------------------------------------------------------------------------
+
 
 def _split_messages(content: str) -> list[str]:
     """Split raw markdown into cleaned individual message blocks."""
@@ -128,7 +175,7 @@ def _extract_chunks(
 
     windows: list[tuple[float, int, str]] = []  # (score, start_idx, text)
     for i in range(0, len(messages), stride):
-        chunk_msgs = messages[i: i + window]
+        chunk_msgs = messages[i : i + window]
         chunk_text = f"\n{_MSG_SEP}\n".join(chunk_msgs)
         score = _score_chunk(chunk_text, query_tokens)
         windows.append((score, i, chunk_text))
@@ -141,17 +188,16 @@ def _extract_chunks(
     for score, start, text in windows:
         end = start + window
         # Skip if overlaps with already selected
-        overlaps = any(
-            not (end <= s or start >= e)
-            for s, e in used_ranges
-        )
+        overlaps = any(not (end <= s or start >= e) for s, e in used_ranges)
         if not overlaps:
-            selected.append({
-                "message_range": f"{start + 1}–{min(end, len(messages))}",
-                "score": round(score, 3),
-                "content": text,
-                "estimated_tokens": len(text) // 4,
-            })
+            selected.append(
+                {
+                    "message_range": f"{start + 1}–{min(end, len(messages))}",
+                    "score": round(score, 3),
+                    "content": text,
+                    "estimated_tokens": len(text) // 4,
+                }
+            )
             used_ranges.append((start, end))
         if len(selected) >= top_k:
             break
@@ -162,6 +208,7 @@ def _extract_chunks(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def get_raw_conversation(config: SynapseConfig, chat_id: str) -> dict[str, Any]:
     """Full raw conversation. Expensive — use get_raw_chunks when you have a query."""

@@ -5,15 +5,32 @@ from typing import Any
 
 from .config import SynapseConfig
 from .dedup import memory_deduplicate as _dedup
-from .diff import apply_update, detect_conflicts, list_pending, propose_update, reject_update, relink_all
+from .diff import (
+    apply_update,
+    detect_conflicts,
+    list_pending,
+    propose_update,
+    reject_update,
+    relink_all,
+)
 from .organizer import organize_vault
 from .watcher import start_watcher, stop_watcher, watcher_status
 from .encryption import read_text
 from .index import MemoryIndex
 from .memory_file import key_to_path, path_to_key, parse_memory_text
-from .ai_importer import import_ai_export as _import_ai_export, ingest_text as _ingest_text, import_filtered_jsonl as _import_filtered_jsonl, import_synapse_summaries as _import_synapse_summaries, save_chat_memory as _save_chat_memory
+from .ai_importer import (
+    import_ai_export as _import_ai_export,
+    ingest_text as _ingest_text,
+    import_filtered_jsonl as _import_filtered_jsonl,
+    import_synapse_summaries as _import_synapse_summaries,
+    save_chat_memory as _save_chat_memory,
+)
 from .graph_builder import build_topic_graph as _build_topic_graph, deep_search as _deep_search
-from .raw_archive import get_raw_conversation as _get_raw, get_raw_chunks as _get_raw_chunks, search_raw_index as _search_raw_index
+from .raw_archive import (
+    get_raw_conversation as _get_raw,
+    get_raw_chunks as _get_raw_chunks,
+    search_raw_index as _search_raw_index,
+)
 from .merger import smart_merge_duplicates as _smart_merge
 from .scanner import scan_and_extract
 from .search import memory_search
@@ -23,6 +40,7 @@ def _estimate_tokens(obj: Any) -> int:
     """Rough token estimate: 1 token ≈ 4 characters of JSON-serialised text."""
     try:
         import json as _json
+
         return max(1, len(_json.dumps(obj, ensure_ascii=False)) // 4)
     except Exception:
         return 0
@@ -107,7 +125,9 @@ def memory_scan_project(config: SynapseConfig, path: str) -> dict[str, Any]:
     }
 
 
-def memory_ingest_text(config: SynapseConfig, text: str, label: str = "[pasted text]") -> dict[str, Any]:
+def memory_ingest_text(
+    config: SynapseConfig, text: str, label: str = "[pasted text]"
+) -> dict[str, Any]:
     result = _ingest_text(config, text, label)
     if "error" in result:
         return result
@@ -129,7 +149,9 @@ def memory_ingest_text(config: SynapseConfig, text: str, label: str = "[pasted t
     }
 
 
-def memory_smart_merge(config: SynapseConfig, dry_run: bool = True, threshold: float = 0.93) -> dict[str, Any]:
+def memory_smart_merge(
+    config: SynapseConfig, dry_run: bool = True, threshold: float = 0.93
+) -> dict[str, Any]:
     return _smart_merge(config, dry_run=dry_run, threshold=threshold)
 
 
@@ -173,7 +195,9 @@ def memory_import_filtered_jsonl(
     redflag_file: str | None = None,
     owner_name: str | None = None,
 ) -> dict[str, Any]:
-    result = _import_filtered_jsonl(config, filtered_jsonl_folder, blacklist_file, redflag_file, owner_name)
+    result = _import_filtered_jsonl(
+        config, filtered_jsonl_folder, blacklist_file, redflag_file, owner_name
+    )
     if "error" in result and "proposals" not in result:
         return result
 
@@ -268,10 +292,11 @@ def memory_context(config: SynapseConfig) -> dict[str, Any]:
     # Run dedup automatically — Jaccard only, no API cost
     try:
         dedup = _dedup(config, auto_clean=False)
-        health: dict[str, Any] = {"total_files": sum(
-            1 for _ in config.vault_path.rglob("*.md")
-            if not _.name.startswith("_")
-        )}
+        health: dict[str, Any] = {
+            "total_files": sum(
+                1 for _ in config.vault_path.rglob("*.md") if not _.name.startswith("_")
+            )
+        }
         issues = []
         if dedup.get("stray_files"):
             issues.append(f"{len(dedup['stray_files'])} stray files")
@@ -294,7 +319,9 @@ def memory_get_raw(config: SynapseConfig, chat_id: str) -> dict[str, Any]:
     return _get_raw(config, chat_id)
 
 
-def memory_get_raw_chunks(config: SynapseConfig, chat_id: str, query: str, top_k: int = 3, window: int = 8) -> dict[str, Any]:
+def memory_get_raw_chunks(
+    config: SynapseConfig, chat_id: str, query: str, top_k: int = 3, window: int = 8
+) -> dict[str, Any]:
     result = _get_raw_chunks(config, chat_id, query, top_k=top_k, window=window)
     if isinstance(result, dict):
         result["_tokens"] = _estimate_tokens(result)
@@ -313,6 +340,7 @@ def memory_code_search(
 ) -> list[dict[str, Any]]:
     """Hybrid FTS5 + semantic search over code nodes indexed by memory_scan_project."""
     from .code_index import search_code, list_projects
+
     if not config.vault_path or not (config.vault_path / "_code_index.db").exists():
         return [{"error": "No code index found. Run memory_scan_project first."}]
     results = search_code(
@@ -331,6 +359,7 @@ def memory_code_search(
 def memory_code_stats(config: SynapseConfig, project: str = "") -> dict[str, Any]:
     """Stats for indexed code projects. Pass project slug to drill in."""
     from .code_index import list_projects, project_stats
+
     if not config.vault_path or not (config.vault_path / "_code_index.db").exists():
         return {"error": "No code index found. Run memory_scan_project first."}
     projects = list_projects(config.vault_path)
@@ -353,8 +382,15 @@ def memory_save_chat(
     chat_id: str | None = None,
 ) -> dict[str, Any]:
     return _save_chat_memory(
-        config, title, summary, key_facts, decisions, tags,
-        keywords=keywords, categories=categories, chat_id=chat_id,
+        config,
+        title,
+        summary,
+        key_facts,
+        decisions,
+        tags,
+        keywords=keywords,
+        categories=categories,
+        chat_id=chat_id,
     )
 
 
@@ -362,7 +398,9 @@ def memory_build_graph(config: SynapseConfig, top_k: int = 8) -> dict[str, Any]:
     return _build_topic_graph(config, top_k=top_k)
 
 
-def memory_deep_search(config: SynapseConfig, query: str, depth: int = 2, top_k: int = 8) -> list[dict[str, Any]]:
+def memory_deep_search(
+    config: SynapseConfig, query: str, depth: int = 2, top_k: int = 8
+) -> list[dict[str, Any]]:
     return _deep_search(config, query, depth=depth, top_k=top_k)
 
 
