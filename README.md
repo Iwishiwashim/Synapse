@@ -4,6 +4,17 @@ A persistent memory vault for Claude, powered by Gemma.
 
 Synapse is a local MCP server that gives Claude structured, searchable memory stored as Markdown files. It indexes 1997+ past conversations into a topic graph, supports tiered retrieval (581–9,000 tokens), and keeps every write behind a diff-review gate.
 
+### Provider Overview
+
+Synapse has two distinct parts with different provider requirements:
+
+| Part | What it does | Providers used | Cost |
+|------|-------------|----------------|------|
+| **MCP Server** | Daily memory reads/writes, search, code indexing | Gemini API only | Free tier (15 RPM) |
+| **Import Pipeline** | One-time bulk import of thousands of past conversations | Gemma (primary) · OpenRouter · Groq · Cerebras | All free tiers |
+
+**Only the Gemini API key is required** to use Synapse day-to-day. The import pipeline keys (OpenRouter, Groq, Cerebras) are only needed if you want to bulk-import your full ChatGPT/Claude conversation history — and all of them have generous free tiers.
+
 ---
 
 ## Table of Contents
@@ -31,8 +42,18 @@ Synapse is a local MCP server that gives Claude structured, searchable memory st
 
 - **Python 3.10+** — `python --version`
 - **Claude Desktop** — [claude.ai/download](https://claude.ai/download)
-- **A Gemini API key** — free tier is enough (see Step 3)
+- **A Gemini API key** — required for everything (free tier is enough, see Step 3)
 - **Git** *(optional but recommended)* — auto-commits every memory write
+
+### API Key Summary
+
+| Key | Where to get | Required for |
+|-----|-------------|--------------|
+| `GEMINI_API_KEY` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | MCP server, summarizer, search — everything |
+| `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) | `Diagnostics/groq_blacklist.py` + `Diagnostics/Triage.py` only |
+| `OPENROUTER_API_KEY` | [openrouter.ai/keys](https://openrouter.ai/keys) | `Diagnostics/Triage.py` only |
+
+**Groq and OpenRouter are only needed if you are running the full ChatGPT export filtering pipeline.** Both have free tiers. If you just want to use Synapse as a memory server, only the Gemini key is needed.
 
 ---
 
