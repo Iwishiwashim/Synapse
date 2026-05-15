@@ -429,13 +429,24 @@ class StepInstall(Step):
             return False, str(e)
 
     def _create_venv(self):
+        import shutil
         if PYTHON.exists():
-            return True, "Virtual environment already exists."
+            # Verify it's actually executable
+            ok, out = self._run_cmd([str(PYTHON), "--version"])
+            if ok:
+                return True, f"Virtual environment already exists. ({out})"
+            # Broken/locked venv — remove and recreate
+            self._log_main("Existing .venv is unusable, recreating…")
+            try:
+                shutil.rmtree(VENV)
+            except Exception as e:
+                return False, f"Could not remove broken .venv: {e}"
         return self._run_cmd([sys.executable, "-m", "venv", str(VENV)])
 
     def _pip_install(self):
+        # Use python -m pip to avoid permission issues with the pip script wrapper
         return self._run_cmd(
-            [str(PIP), "install", "--prefer-binary", "-r", "requirements.txt", "pytest"]
+            [str(PYTHON), "-m", "pip", "install", "--prefer-binary", "-r", "requirements.txt", "pytest"]
         )
 
     def _write_config(self):
