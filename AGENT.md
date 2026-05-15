@@ -6,7 +6,15 @@ Synapse is a persistent, structured memory system for Claude. It stores memories
 
 ## FIRST THING EVERY CONVERSATION
 
-**Call `memory_context()` immediately** — returns `identity.profile` + `identity.communication` + `identity.location` + live dedup health check in one call. (~581 tokens). If `_vault_health.clean` is False, flag issues and offer to run `memory_deduplicate(auto_clean=True)`. Do this before any other tool call, every time.
+**Call `memory_auto(task)` for any retrieval question** — it loads context, searches the active vault, and escalates to deep search automatically. You do not need to chain `memory_context → memory_search → memory_deep_search` manually; `memory_auto` does it for you.
+
+For write operations use **`memory_commit(patch)`** — behaviour depends on `write_mode` in config:
+- `review` (default) — proposes a diff the user must approve before anything is written
+- `auto` — applies immediately with no confirmation
+
+Check the mode in the context response. In `review` mode, always show the diff and wait. In `auto` mode, write and confirm what was saved.
+
+If `_vault_health.clean` is False in the context response, flag it and offer to run `memory_deduplicate(auto_clean=True)`.
 
 ---
 
@@ -95,12 +103,18 @@ Each active vault file has YAML frontmatter (`key`, `type`, `triggers`, `related
 | `memory_get_raw(id)` | ~5,000–35,000 | Full raw conversation. Only when complete history is explicitly needed. |
 | `memory_search_raw("title")` | ~200 | Fast title-only search over raw archive index. Use when you know the conversation name. |
 
-### Writing memories
+### Smart tools (use these by default)
 | Tool | When |
 |---|---|
-| `memory_propose_update(patch)` | Propose a new or updated memory. Returns a diff for review. |
-| `memory_apply_update(patch_id)` | Approve and write a proposed patch. |
-| `memory_reject_update(patch_id)` | Discard a proposed patch. |
+| `memory_auto("task")` | **Default retrieval.** Loads context + vault search + deep search if needed. One call instead of three. |
+| `memory_commit(patch)` | **Default write.** Behaviour set by `write_mode`: proposes diff in `review`, applies immediately in `auto`. |
+
+### Writing memories (low-level, use when you need fine control)
+| Tool | When |
+|---|---|
+| `memory_propose_update(patch)` | Propose a patch and return a diff without writing. |
+| `memory_apply_update(patch_id)` | Apply an approved pending patch. |
+| `memory_reject_update(patch_id)` | Discard a pending patch. |
 | `memory_diff()` | List all pending patches awaiting approval. |
 
 ### Maintenance (run after bulk imports or scans)

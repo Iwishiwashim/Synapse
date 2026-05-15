@@ -79,6 +79,11 @@ def _write_config(cfg: dict) -> None:
         "#   GEMINI_API_KEY=your_key_here",
         "# Or paste below:",
         f"gemini_api_key: \"{cfg.get('gemini_api_key', '')}\"",
+        "",
+        "# How Claude handles memory writes.",
+        "# review — Claude proposes a diff you approve before anything is written (default, safer).",
+        "# auto   — Claude writes directly with no confirmation needed (faster).",
+        f"write_mode: {cfg.get('write_mode', 'review')}",
     ]
     CONFIG_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -277,6 +282,16 @@ def main() -> None:
     else:
         print("  Raw archive disabled.")
 
+    print()
+
+    # --- Write mode ---
+    print("Memory write mode:")
+    print("  review — Claude proposes a diff you approve before anything is written (default, safer)")
+    print("  auto   — Claude writes directly, no confirmation needed (faster)")
+    current_mode = str(cfg.get("write_mode", "review"))
+    mode_input = _ask(f"Write mode [{current_mode}] (Enter to keep): ") or current_mode
+    cfg["write_mode"] = "auto" if mode_input.strip().lower() == "auto" else "review"
+    print(f"  Write mode: {cfg['write_mode']}")
     print()
 
     # Write updated config.yaml

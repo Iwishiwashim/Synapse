@@ -13,9 +13,11 @@ from mcp.server.fastmcp import FastMCP
 from .config import load_config
 from .functions import (
     memory_apply_update,
+    memory_auto,
     memory_build_graph,
     memory_code_search,
     memory_code_stats,
+    memory_commit,
     memory_save_chat,
     memory_conflicts,
     memory_get_raw,
@@ -260,6 +262,18 @@ def save_chat(
         categories=categories or None,
         chat_id=chat_id or None,
     )
+
+
+@app.tool(name="memory_auto")
+def auto(task: str) -> dict:
+    """Smart retrieval dispatcher. Call this instead of manually chaining context → search → deep_search. Loads context, searches the active vault, and escalates to deep search automatically when vault results are thin."""
+    return memory_auto(config, task)
+
+
+@app.tool(name="memory_commit")
+def commit(patch: dict) -> dict:
+    """Write a memory patch using the configured write_mode. In 'review' mode (default) proposes a diff for human approval. In 'auto' mode applies immediately without confirmation. Same patch format as memory_propose_update."""
+    return memory_commit(config, patch)
 
 
 def main() -> None:

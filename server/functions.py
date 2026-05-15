@@ -274,6 +274,7 @@ def memory_context(config: SynapseConfig) -> dict[str, Any]:
     except Exception:
         pass
 
+    result["_write_mode"] = config.write_mode
     return result
 
 
@@ -348,6 +349,43 @@ def memory_build_graph(config: SynapseConfig, top_k: int = 8) -> dict[str, Any]:
 
 def memory_deep_search(config: SynapseConfig, query: str, depth: int = 2, top_k: int = 8) -> list[dict[str, Any]]:
     return _deep_search(config, query, depth=depth, top_k=top_k)
+
+
+def memory_auto(config: SynapseConfig, task: str) -> dict[str, Any]:
+    """
+    Smart retrieval dispatcher. Always loads context, searches active vault,
+    and escalates to deep search automatically when vault results are thin.
+    Claude calls this instead of manually chaining context → search → deep_search.
+    """
+    result: dict[str, Any] = {}
+
+    # Tier 1: always
+    result["context"] = memory_context(config)
+
+    # Tier 2: active vault FTS
+    vault_hits = memory_search_tool(config, task)
+    result["vault_results"] = vault_hits
+
+    # Tier 3: escalate if vault has fewer than 2 hits
+    if len(vault_hits) < 2:
+        result["deep_results"] = _deep_search(config, task)
+
+    return result
+
+
+def memory_commit(config: SynapseConfig, patch: dict[str, Any]) -> dict[str, Any]:
+    """
+    Write a memory patch using the configured write_mode.
+    - review (default): proposes a diff for human approval, same as memory_propose_update.
+    - auto: proposes then immediately applies — no confirmation needed.
+    """
+    proposed = memory_propose_update(config, patch)
+    if config.write_mode != "auto":
+        return proposed
+    patch_id = proposed.get("patch_id")
+    if not patch_id:
+        return proposed
+    return memory_apply_update(config, patch_id)
 
 
 def rebuild_index(config: SynapseConfig) -> dict[str, str]:
