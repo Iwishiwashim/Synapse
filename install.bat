@@ -1,3 +1,7 @@
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0installer\wizard.ps1"
-pause
+python "%~dp0installer\setup_wizard.py"
+if %ERRORLEVEL% NEQ 0 (
+    echo Python not found. Please install Python 3.10+ from https://python.org/downloads
+    pause
+)
+
