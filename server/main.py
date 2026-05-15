@@ -14,6 +14,8 @@ from .config import load_config
 from .functions import (
     memory_apply_update,
     memory_build_graph,
+    memory_code_search,
+    memory_code_stats,
     memory_conflicts,
     memory_get_raw,
     memory_get_raw_chunks,
@@ -225,6 +227,18 @@ def build_graph(top_k: int = 8) -> dict:
 def deep_search(query: str, depth: int = 2, top_k: int = 8) -> list[dict]:
     """Graph-guided chat search. FTS5 finds entry nodes, graph traversal expands to related conversations, returns ranked summaries. Requires memory_build_graph to have been run first."""
     return memory_deep_search(config, query, depth=depth, top_k=top_k)
+
+
+@app.tool(name="memory_code_search")
+def code_search(query: str, project: str = "", limit: int = 8) -> list[dict]:
+    """Hybrid FTS5 + semantic search over code nodes indexed by memory_scan_project. Pass project slug to scope to one codebase, or leave blank to search all. Returns matching functions/files with description, file path, line number, and call edges."""
+    return memory_code_search(config, query, project=project, limit=limit)
+
+
+@app.tool(name="memory_code_stats")
+def code_stats(project: str = "") -> dict:
+    """Stats for code projects indexed by memory_scan_project. Pass project slug to drill in, or leave blank to list all indexed projects."""
+    return memory_code_stats(config, project=project)
 
 
 def main() -> None:

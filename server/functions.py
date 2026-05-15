@@ -289,6 +289,42 @@ def memory_search_raw(config: SynapseConfig, query: str, top_k: int = 10) -> lis
     return _search_raw_index(config, query, top_k=top_k)
 
 
+def memory_code_search(
+    config: SynapseConfig,
+    query: str,
+    project: str = "",
+    limit: int = 8,
+) -> list[dict[str, Any]]:
+    """Hybrid FTS5 + semantic search over code nodes indexed by memory_scan_project."""
+    from .code_index import search_code, list_projects
+    if not config.vault_path or not (config.vault_path / "_code_index.db").exists():
+        return [{"error": "No code index found. Run memory_scan_project first."}]
+    results = search_code(
+        config.vault_path,
+        config.gemini_api_key or None,
+        query,
+        project=project,
+        limit=limit,
+    )
+    if not results:
+        projects = list_projects(config.vault_path)
+        return [{"info": "No results.", "indexed_projects": projects}]
+    return results
+
+
+def memory_code_stats(config: SynapseConfig, project: str = "") -> dict[str, Any]:
+    """Stats for indexed code projects. Pass project slug to drill in."""
+    from .code_index import list_projects, project_stats
+    if not config.vault_path or not (config.vault_path / "_code_index.db").exists():
+        return {"error": "No code index found. Run memory_scan_project first."}
+    projects = list_projects(config.vault_path)
+    if project:
+        if project not in projects:
+            return {"error": f"Project {project!r} not indexed.", "indexed_projects": projects}
+        return {"project": project, **project_stats(config.vault_path, project)}
+    return {"indexed_projects": projects}
+
+
 def memory_build_graph(config: SynapseConfig, top_k: int = 8) -> dict[str, Any]:
     return _build_topic_graph(config, top_k=top_k)
 

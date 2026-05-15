@@ -1,0 +1,342 @@
+"""
+Structural code graph extractor.
+Parses Python (AST) and TypeScript/JS (regex) to produce:
+  - file nodes
+  - function/class nodes with source body
+  - edges: contains | imports_from | calls | exports
+No LLM required. Pure static analysis.
+"""
+from __future__ import annotations
+
+import ast
+import re
+from pathlib import Path
+from typing import Any
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def extract_code_graph(files: dict[str, str]) -> dict[str, Any]:
+    """
+    Given {rel_path: content}, return a graph dict:
+    {
+        "nodes": [...],
+        "edges": [...]
+    }
+    Each function/class node includes "source" (body text, up to 3000 chars).
+    """
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    node_ids: set[str] = set()
+
+    for rel_path, content in files.items():
+        file_id = path_to_node_id(rel_path)
+        if file_id not in node_ids:
+            nodes.append({"id": file_id, "label": Path(rel_path).name, "file": rel_path, "type": "file"})
+            node_ids.add(file_id)
+
+        ext = Path(rel_path).suffix.lower()
+        if ext == ".py":
+            _extract_python(file_id, rel_path, content, nodes, edges, node_ids)
+        elif ext in {".ts", ".tsx", ".js", ".jsx", ".cjs", ".mjs"}:
+            _extract_typescript(file_id, rel_path, content, nodes, edges, node_ids)
+
+    # Build a set of all known node IDs for edge filtering
+    known_ids = {n["id"] for n in nodes}
+
+    # Filter: keep call edges only where both endpoints exist (reduces external-lib noise)
+    # Keep all other edge types (imports_from, contains, exports) regardless
+    edges = [
+        e for e in edges
+        if e["relation"] != "calls" or (e["source"] in known_ids and e["target"] in known_ids)
+    ]
+
+    return {"nodes": nodes, "edges": edges}
+
+
+def path_to_node_id(rel_path: str) -> str:
+    """
+    electron/main.cjs  -> electron-main
+    lib/server/bridge.ts -> lib-server-bridge
+    server_control.py  -> server-control
+    """
+    p = Path(rel_path)
+    parts = [*p.parts[:-1], p.stem]
+    slug = "-".join(parts)
+    slug = re.sub(r"[_\s]+", "-", slug)
+    slug = re.sub(r"[^a-zA-Z0-9\-]", "", slug)
+    slug = re.sub(r"-+", "-", slug).strip("-").lower()
+    return slug
+
+
+def node_id_to_vault_key(project_key: str, node_id: str) -> str:
+    return f"{project_key}.{node_id.replace('-', '.')}"
+
+
+def function_vault_key(project_key: str, file_id: str, fn_slug: str) -> str:
+    return f"{project_key}.{file_id}.{fn_slug}"
+
+
+def file_edges(graph: dict[str, Any], file_id: str) -> list[dict[str, Any]]:
+    return [e for e in graph["edges"] if e["source"] == file_id or e["target"] == file_id]
+
+
+def related_file_ids(graph: dict[str, Any], file_id: str, limit: int = 5) -> list[str]:
+    weights = {"imports_from": 3, "calls": 2, "exports": 1, "contains": 0}
+    scores: dict[str, float] = {}
+    file_node_ids = {n["id"] for n in graph["nodes"] if n.get("type") == "file"}
+
+    for e in graph["edges"]:
+        src, tgt, rel = e["source"], e["target"], e.get("relation", "")
+        w = weights.get(rel, 1)
+        if src == file_id and tgt in file_node_ids and tgt != file_id:
+            scores[tgt] = scores.get(tgt, 0) + w
+        elif tgt == file_id and src in file_node_ids and src != file_id:
+            scores[src] = scores.get(src, 0) + w
+
+    return sorted(scores, key=lambda k: -scores[k])[:limit]
+
+
+# ---------------------------------------------------------------------------
+# Python extractor (AST-based)
+# ---------------------------------------------------------------------------
+
+def _extract_python(
+    file_id: str, rel_path: str, content: str,
+    nodes: list, edges: list, node_ids: set,
+) -> None:
+    try:
+        tree = ast.parse(content, filename=rel_path)
+    except SyntaxError:
+        return
+
+    # Collect all top-level and nested definitions
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            mod_id = _mod_to_id(node.module)
+            edges.append({"source": file_id, "target": mod_id, "relation": "imports_from"})
+
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                mod_id = _mod_to_id(alias.name)
+                edges.append({"source": file_id, "target": mod_id, "relation": "imports_from"})
+
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            fn_slug = _name_to_slug(node.name)
+            fn_id = f"{file_id}-{fn_slug}"
+            if fn_id not in node_ids:
+                sig = _py_signature(node)
+                doc = ast.get_docstring(node) or ""
+                source = _get_source(content, node)
+                nodes.append({
+                    "id": fn_id,
+                    "label": f"{node.name}()",
+                    "file": rel_path,
+                    "type": "function",
+                    "parent": file_id,
+                    "signature": sig,
+                    "docstring": doc[:200],
+                    "source": source,
+                    "lineno": node.lineno,
+                    "lineno_end": getattr(node, "end_lineno", node.lineno),
+                })
+                node_ids.add(fn_id)
+                edges.append({"source": file_id, "target": fn_id, "relation": "contains"})
+
+                # Extract call edges from function body
+                for child in ast.walk(node):
+                    if child is node:
+                        continue
+                    if isinstance(child, ast.Call):
+                        called_id = _resolve_call(child, file_id)
+                        if called_id and called_id != fn_id:
+                            edges.append({"source": fn_id, "target": called_id, "relation": "calls"})
+
+        elif isinstance(node, ast.ClassDef):
+            cls_slug = _name_to_slug(node.name)
+            cls_id = f"{file_id}-{cls_slug}"
+            if cls_id not in node_ids:
+                source = _get_source(content, node)
+                nodes.append({
+                    "id": cls_id,
+                    "label": node.name,
+                    "file": rel_path,
+                    "type": "class",
+                    "parent": file_id,
+                    "source": source[:1500],
+                    "lineno": node.lineno,
+                    "lineno_end": getattr(node, "end_lineno", node.lineno),
+                })
+                node_ids.add(cls_id)
+                edges.append({"source": file_id, "target": cls_id, "relation": "contains"})
+
+
+def _resolve_call(call_node: ast.Call, file_id: str) -> str | None:
+    """Try to resolve a Call node to a node ID in the same file."""
+    func = call_node.func
+    if isinstance(func, ast.Name):
+        return f"{file_id}-{_name_to_slug(func.id)}"
+    if isinstance(func, ast.Attribute):
+        # e.g. self.foo() → file_id-foo; obj.method() → file_id-method
+        return f"{file_id}-{_name_to_slug(func.attr)}"
+    return None
+
+
+def _get_source(content: str, node: ast.AST) -> str:
+    """Extract source text for a node using ast.get_source_segment (Python 3.8+)."""
+    try:
+        src = ast.get_source_segment(content, node) or ""
+        return src[:3000]
+    except Exception:
+        return ""
+
+
+def _py_signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    args = []
+    for arg in node.args.args:
+        if arg.annotation:
+            type_str = ast.unparse(arg.annotation)
+            args.append(f"{arg.arg}: {type_str}")
+        else:
+            args.append(arg.arg)
+
+    if node.args.vararg:
+        args.append(f"*{node.args.vararg.arg}")
+    if node.args.kwarg:
+        args.append(f"**{node.args.kwarg.arg}")
+
+    ret = ""
+    if node.returns:
+        ret = f" -> {ast.unparse(node.returns)}"
+
+    prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
+    return f"{prefix}def {node.name}({', '.join(args)}){ret}"
+
+
+def _mod_to_id(module: str) -> str:
+    return re.sub(r"[._\s]+", "-", module).lower()
+
+
+def _name_to_slug(name: str) -> str:
+    return re.sub(r"_+", "-", name).lower()
+
+
+# ---------------------------------------------------------------------------
+# TypeScript / JavaScript extractor (regex-based)
+# ---------------------------------------------------------------------------
+
+# Named function declarations (exported or not)
+_TS_FN = re.compile(r"""(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[(<]""")
+# Arrow / const exports: export const foo = ..., export const foo: Type = ...
+_TS_ARROW = re.compile(r"""export\s+(?:const|let|var)\s+(\w+)(?:\s*:\s*[\w<>\[\]|&]+)?\s*[=]""")
+# Class declarations
+_TS_CLASS = re.compile(r"""(?:export\s+)?(?:abstract\s+)?class\s+(\w+)""")
+# Default export function
+_TS_DEFAULT_FN = re.compile(r"""export\s+default\s+(?:async\s+)?function\s+(\w+)""")
+# Import statements
+_TS_IMPORT = re.compile(r"""from\s+['"](@?[\w/@.-]+)['"]""")
+_TS_REQUIRE = re.compile(r"""require\s*\(\s*['"](@?[\w/@.-]+)['"]\s*\)""")
+# Call expressions: functionName(
+_TS_CALL = re.compile(r"""(?<!\w)(\w+)\s*\(""")
+
+
+def _extract_typescript(
+    file_id: str, rel_path: str, content: str,
+    nodes: list, edges: list, node_ids: set,
+) -> None:
+    _SKIP_KW = {"if", "for", "while", "switch", "catch", "return", "typeof", "instanceof",
+                "new", "delete", "void", "throw", "case", "in", "of", "from", "import",
+                "export", "class", "function", "async", "await", "yield", "super", "this"}
+
+    # --- imports ---
+    for pattern in (_TS_IMPORT, _TS_REQUIRE):
+        for m in pattern.finditer(content):
+            raw = m.group(1)
+            mod_id = raw.lstrip("@").replace("/", "-").replace("_", "-").replace(".", "-").lower()
+            mod_id = re.sub(r"-+", "-", mod_id).strip("-")
+            edges.append({"source": file_id, "target": mod_id, "relation": "imports_from"})
+
+    # --- named functions ---
+    for m in _TS_FN.finditer(content):
+        fn_name = m.group(1)
+        if fn_name in _SKIP_KW:
+            continue
+        _add_ts_node(file_id, rel_path, content, fn_name, "function", m.start(),
+                     nodes, edges, node_ids)
+
+    # --- default export function ---
+    for m in _TS_DEFAULT_FN.finditer(content):
+        fn_name = m.group(1)
+        if fn_name not in _SKIP_KW:
+            _add_ts_node(file_id, rel_path, content, fn_name, "function", m.start(),
+                         nodes, edges, node_ids)
+
+    # --- arrow / const exports ---
+    for m in _TS_ARROW.finditer(content):
+        name = m.group(1)
+        if name not in _SKIP_KW:
+            _add_ts_node(file_id, rel_path, content, name, "function", m.start(),
+                         nodes, edges, node_ids)
+
+    # --- classes ---
+    for m in _TS_CLASS.finditer(content):
+        cls_name = m.group(1)
+        if cls_name not in _SKIP_KW:
+            _add_ts_node(file_id, rel_path, content, cls_name, "class", m.start(),
+                         nodes, edges, node_ids)
+
+    # --- call edges (best-effort) ---
+    known_fns = {n["id"] for n in nodes if n.get("parent") == file_id}
+    for m in _TS_CALL.finditer(content):
+        name = m.group(1)
+        if name in _SKIP_KW or not name[0].islower():
+            continue
+        target_id = f"{file_id}-{_name_to_slug(name)}"
+        if target_id in known_fns:
+            # We don't know which source function this comes from in a regex pass,
+            # so emit file-level call edge as approximation
+            edges.append({"source": file_id, "target": target_id, "relation": "calls"})
+
+
+def _add_ts_node(
+    file_id: str, rel_path: str, content: str,
+    name: str, ntype: str, pos: int,
+    nodes: list, edges: list, node_ids: set,
+) -> None:
+    slug = _name_to_slug(name)
+    node_id = f"{file_id}-{slug}"
+    if node_id in node_ids:
+        return
+    lineno = content[:pos].count("\n") + 1
+    # Extract approximate body: from this position to end of next matching brace block
+    body = _extract_ts_body(content, pos)
+    nodes.append({
+        "id": node_id,
+        "label": f"{name}()" if ntype == "function" else name,
+        "file": rel_path,
+        "type": ntype,
+        "parent": file_id,
+        "source": body[:3000],
+        "lineno": lineno,
+    })
+    node_ids.add(node_id)
+    relation = "exports" if "export" in content[max(0, pos - 10):pos + 10] else "contains"
+    edges.append({"source": file_id, "target": node_id, "relation": relation})
+
+
+def _extract_ts_body(content: str, start: int) -> str:
+    """Find the opening brace after start and extract the balanced block."""
+    brace_start = content.find("{", start)
+    if brace_start == -1:
+        return content[start:start + 500]
+    depth = 0
+    for i in range(brace_start, min(len(content), brace_start + 8000)):
+        if content[i] == "{":
+            depth += 1
+        elif content[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return content[start:i + 1]
+    return content[start:brace_start + 500]
