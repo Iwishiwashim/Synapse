@@ -1,0 +1,260 @@
+"""
+Regression tests for core Synapse logic — no network, no LLM, no vault on disk.
+Run with: pytest tests/
+"""
+from __future__ import annotations
+
+import json
+import tempfile
+from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# _parse_patch
+# ---------------------------------------------------------------------------
+
+def test_parse_patch_valid_json():
+    from server.scanner import _parse_patch
+    raw = '{"key": "projects.myapp.index", "content": "Main entry point.", "type": "code", "scope": "global", "weight": 0.8}'
+    result = _parse_patch(raw)
+    assert result is not None
+    assert result["key"] == "projects.myapp.index"
+    assert result["content"] == "Main entry point."
+
+
+def test_parse_patch_strips_markdown_fences():
+    from server.scanner import _parse_patch
+    raw = '```json\n{"key": "a.b", "content": "Some content."}\n```'
+    result = _parse_patch(raw)
+    assert result is not None
+    assert result["key"] == "a.b"
+
+
+def test_parse_patch_extracts_embedded_object():
+    from server.scanner import _parse_patch
+    raw = 'Here is the result:\n{"key": "x.y", "content": "Desc."}\nDone.'
+    result = _parse_patch(raw)
+    assert result is not None
+    assert result["key"] == "x.y"
+
+
+def test_parse_patch_returns_none_for_garbage():
+    from server.scanner import _parse_patch
+    assert _parse_patch("not json at all") is None
+
+
+def test_parse_patch_returns_none_missing_key():
+    from server.scanner import _parse_patch
+    assert _parse_patch('{"content": "No key field."}') is None
+
+
+def test_parse_patch_returns_none_missing_content():
+    from server.scanner import _parse_patch
+    assert _parse_patch('{"key": "a.b"}') is None
+
+
+# ---------------------------------------------------------------------------
+# _is_vague
+# ---------------------------------------------------------------------------
+
+def test_is_vague_flags_short_generic():
+    from server.scanner import _is_vague
+    assert _is_vague("Handles the bridge process.", "def initBridge()") is True
+
+
+def test_is_vague_flags_paraphrase_of_name():
+    from server.scanner import _is_vague
+    assert _is_vague("Starts watching the files.", "def startWatcher()") is True
+
+
+def test_is_vague_passes_with_port_number():
+    from server.scanner import _is_vague
+    assert _is_vague("Listens on port 5056 for incoming requests.", "def startServer()") is False
+
+
+def test_is_vague_passes_with_camelcase():
+    from server.scanner import _is_vague
+    assert _is_vague("Calls findFreePort then spawns bridgeProcess.", "def startBridge()") is False
+
+
+def test_is_vague_passes_with_constant():
+    from server.scanner import _is_vague
+    assert _is_vague("Reads MAX_FILE_BYTES from env and truncates input.", "def readFile()") is False
+
+
+def test_is_vague_passes_with_path():
+    from server.scanner import _is_vague
+    assert _is_vague("Writes output to ./vault/_graph.json.", "def saveGraph()") is False
+
+
+def test_is_vague_passes_with_backtick():
+    from server.scanner import _is_vague
+    assert _is_vague("Returns `{'status': 'ok'}` after flushing queue.", "def flush()") is False
+
+
+# ---------------------------------------------------------------------------
+# _inject_wikilinks
+# ---------------------------------------------------------------------------
+
+def test_inject_wikilinks_appends_related():
+    from server.diff import _inject_wikilinks
+    result = _inject_wikilinks("Body text.", ["work.stack", "work.tools"])
+    assert "Related:" in result
+    assert "[[work/stack]]" in result
+    assert "[[work/tools]]" in result
+
+
+def test_inject_wikilinks_replaces_existing_related_line():
+    from server.diff import _inject_wikilinks
+    content = "Body\n\nRelated: [[old/link]]"
+    result = _inject_wikilinks(content, ["new.link"])
+    assert "old" not in result
+    assert "[[new/link]]" in result
+
+
+def test_inject_wikilinks_empty_list_removes_related():
+    from server.diff import _inject_wikilinks
+    content = "Body\n\nRelated: [[some/link]]"
+    result = _inject_wikilinks(content, [])
+    assert "Related:" not in result
+
+
+def test_inject_wikilinks_uses_pipe_separator():
+    from server.diff import _inject_wikilinks
+    result = _inject_wikilinks("X", ["a.b", "c.d"])
+    assert " | " in result
+
+
+# ---------------------------------------------------------------------------
+# load_pending resilience
+# ---------------------------------------------------------------------------
+
+def _make_config(vault: Path):
+    from server.config import SynapseConfig
+    return SynapseConfig(root_path=vault.parent, vault_path=vault)
+
+
+def test_load_pending_missing_file_returns_empty():
+    from server.diff import load_pending
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        assert load_pending(_make_config(vault)) == []
+
+
+def test_load_pending_empty_file_returns_empty():
+    from server.diff import load_pending
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        (vault / "_pending.json").write_text("", encoding="utf-8")
+        assert load_pending(_make_config(vault)) == []
+
+
+def test_load_pending_newline_only_returns_empty():
+    from server.diff import load_pending
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        (vault / "_pending.json").write_text("\n", encoding="utf-8")
+        assert load_pending(_make_config(vault)) == []
+
+
+def test_load_pending_corrupt_json_returns_empty():
+    from server.diff import load_pending
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        (vault / "_pending.json").write_text("{corrupted", encoding="utf-8")
+        assert load_pending(_make_config(vault)) == []
+
+
+def test_load_pending_valid_queue():
+    from server.diff import load_pending
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        queue = [{"patch_id": "abc123", "key": "work.stack", "status": "pending"}]
+        (vault / "_pending.json").write_text(json.dumps(queue), encoding="utf-8")
+        result = load_pending(_make_config(vault))
+        assert len(result) == 1
+        assert result[0]["patch_id"] == "abc123"
+
+
+# ---------------------------------------------------------------------------
+# cleanup_stale_nodes
+# ---------------------------------------------------------------------------
+
+def _write_md(path: Path, key: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"---\nkey: {key}\n---\n\ncontent\n", encoding="utf-8")
+
+
+def test_cleanup_removes_stale_function_node():
+    from server.diff import cleanup_stale_nodes
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        fn_dir = vault / "projects" / "myapp" / "server"
+        stale = fn_dir / "old-fn.md"
+        _write_md(stale, "projects.myapp.server.old-fn")
+        cfg = _make_config(vault)
+
+        graph = {"nodes": [{"id": "server", "type": "file"}], "edges": []}
+        result = cleanup_stale_nodes(cfg, "myapp", graph)
+
+        assert result["count"] == 1
+        assert not stale.exists()
+
+
+def test_cleanup_keeps_current_function_node():
+    from server.diff import cleanup_stale_nodes
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        fn_dir = vault / "projects" / "myapp" / "server"
+        keep = fn_dir / "get-data.md"
+        _write_md(keep, "projects.myapp.server.get-data")
+        cfg = _make_config(vault)
+
+        graph = {
+            "nodes": [
+                {"id": "server", "type": "file"},
+                {"id": "server-get-data", "type": "function", "parent": "server"},
+            ],
+            "edges": [],
+        }
+        result = cleanup_stale_nodes(cfg, "myapp", graph)
+
+        assert result["count"] == 0
+        assert keep.exists()
+
+
+def test_cleanup_ignores_unscanned_file_dirs():
+    from server.diff import cleanup_stale_nodes
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        # 'utils' was NOT scanned — cleanup must leave it alone
+        fn_dir = vault / "projects" / "myapp" / "utils"
+        untouched = fn_dir / "helper.md"
+        _write_md(untouched, "projects.myapp.utils.helper")
+        cfg = _make_config(vault)
+
+        graph = {"nodes": [{"id": "server", "type": "file"}], "edges": []}
+        result = cleanup_stale_nodes(cfg, "myapp", graph)
+
+        assert result["count"] == 0
+        assert untouched.exists()
+
+
+def test_cleanup_removes_empty_dir_after_last_node():
+    from server.diff import cleanup_stale_nodes
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        fn_dir = vault / "projects" / "myapp" / "server"
+        only_fn = fn_dir / "gone.md"
+        _write_md(only_fn, "projects.myapp.server.gone")
+        cfg = _make_config(vault)
+
+        graph = {"nodes": [{"id": "server", "type": "file"}], "edges": []}
+        cleanup_stale_nodes(cfg, "myapp", graph)
+
+        assert not fn_dir.exists()
