@@ -428,29 +428,42 @@ class StepInstall(Step):
         except Exception as e:
             return False, str(e)
 
+    def _venv_site_packages(self):
+        """Return the venv site-packages path for the current platform."""
+        if platform.system() == "Windows":
+            return VENV / "Lib" / "site-packages"
+        v = sys.version_info
+        return VENV / "lib" / f"python{v.major}.{v.minor}" / "site-packages"
+
     def _create_venv(self):
         import shutil
-        if PYTHON.exists():
-            # Verify it's actually executable
-            ok, out = self._run_cmd([str(PYTHON), "--version"])
-            if ok:
-                return True, f"Virtual environment already exists. ({out})"
-            # Broken/locked venv — remove and recreate
-            self._log_main("Existing .venv is unusable, recreating…")
+        if VENV.exists() and self._venv_site_packages().exists():
+            return True, "Virtual environment already exists."
+        if VENV.exists():
+            self._log_main("Removing incomplete .venv…")
             try:
                 shutil.rmtree(VENV)
             except Exception as e:
-                return False, f"Could not remove broken .venv: {e}"
+                return False, f"Could not remove existing .venv: {e}"
         return self._run_cmd([sys.executable, "-m", "venv", str(VENV)])
 
     def _pip_install(self):
-        # Use python -m pip to avoid permission issues with the pip script wrapper
+        # Use the launching Python + --prefix to avoid executing the venv's
+        # python.exe, which Windows Defender may block on first use.
+        env = os.environ.copy()
+        env["PIP_REQUIRE_VIRTUALENV"] = "0"
         return self._run_cmd(
-            [str(PYTHON), "-m", "pip", "install", "--prefer-binary", "-r", "requirements.txt", "pytest"]
+            [sys.executable, "-m", "pip", "install", "--prefer-binary",
+             "--prefix", str(VENV), "-r", "requirements.txt", "pytest"],
+            env=env,
         )
 
     def _write_config(self):
-        import yaml  # installed by requirements.txt
+        # yaml may be in the venv — add site-packages to path so import works
+        site = str(self._venv_site_packages())
+        if site not in sys.path:
+            sys.path.insert(0, site)
+        import yaml
         cfg_path = ROOT / "config.yaml"
         cfg = {}
         if cfg_path.exists():
@@ -468,12 +481,16 @@ class StepInstall(Step):
         return True, f"config.yaml written (write_mode={cfg['write_mode']})"
 
     def _run_tests(self):
-        ok, out = self._run_cmd([str(PYTHON), "-m", "pytest", "Diagnostics/test_core.py", "-v"])
-        # Don't fail the install if tests fail — just report
-        return True, out
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(self._venv_site_packages())
+        ok, out = self._run_cmd(
+            [sys.executable, "-m", "pytest", "Diagnostics/test_core.py", "-v"], env=env
+        )
+        return True, out  # don't fail install on test failures — just report
 
     def _write_mcp(self):
-        python_path = str(PYTHON)
+        # Use sys.executable (the Python that runs the wizard / the venv we installed into)
+        python_path = str(PYTHON) if PYTHON.exists() else sys.executable
         server_path = str(ROOT / "server" / "main.py")
         entry_cfg = {"command": python_path, "args": [server_path]}
 
