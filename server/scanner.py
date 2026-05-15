@@ -558,7 +558,10 @@ def _make_function_proposals(
 
 
 def _is_vague(description: str, signature: str) -> bool:
-    if any(c in description for c in ("`", "/", "\\", ".")):
+    # Specific markers: backticks, paths (slash or letter.letter), camelCase
+    if "`" in description or "/" in description or "\\" in description:
+        return False
+    if re.search(r"[a-zA-Z]\.[a-zA-Z]", description):  # path-like dot, not sentence period
         return False
     if re.search(r"[a-z][A-Z]", description):
         return False

@@ -11,7 +11,7 @@ from .watcher import start_watcher, stop_watcher, watcher_status
 from .encryption import read_text
 from .index import MemoryIndex
 from .memory_file import key_to_path, path_to_key, parse_memory_text
-from .ai_importer import import_ai_export as _import_ai_export, ingest_text as _ingest_text, import_filtered_jsonl as _import_filtered_jsonl, import_synapse_summaries as _import_synapse_summaries
+from .ai_importer import import_ai_export as _import_ai_export, ingest_text as _ingest_text, import_filtered_jsonl as _import_filtered_jsonl, import_synapse_summaries as _import_synapse_summaries, save_chat_memory as _save_chat_memory
 from .graph_builder import build_topic_graph as _build_topic_graph, deep_search as _deep_search
 from .raw_archive import get_raw_conversation as _get_raw, get_raw_chunks as _get_raw_chunks, search_raw_index as _search_raw_index
 from .merger import smart_merge_duplicates as _smart_merge
@@ -323,6 +323,23 @@ def memory_code_stats(config: SynapseConfig, project: str = "") -> dict[str, Any
             return {"error": f"Project {project!r} not indexed.", "indexed_projects": projects}
         return {"project": project, **project_stats(config.vault_path, project)}
     return {"indexed_projects": projects}
+
+
+def memory_save_chat(
+    config: SynapseConfig,
+    title: str,
+    summary: str,
+    key_facts: list[str],
+    decisions: list[str],
+    tags: list[str],
+    keywords: str = "",
+    categories: list[str] | None = None,
+    chat_id: str | None = None,
+) -> dict[str, Any]:
+    return _save_chat_memory(
+        config, title, summary, key_facts, decisions, tags,
+        keywords=keywords, categories=categories, chat_id=chat_id,
+    )
 
 
 def memory_build_graph(config: SynapseConfig, top_k: int = 8) -> dict[str, Any]:

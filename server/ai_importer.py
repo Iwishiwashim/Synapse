@@ -956,3 +956,96 @@ def ingest_text(config: "SynapseConfig", text: str, label: str = "[pasted text]"
             proposals.extend(patches)
 
     return {"proposals": proposals}
+
+
+def save_chat_memory(
+    config: "SynapseConfig",
+    title: str,
+    summary: str,
+    key_facts: list[str],
+    decisions: list[str],
+    tags: list[str],
+    keywords: str = "",
+    categories: list[str] | None = None,
+    chat_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    Save the current conversation as a chat summary in vault/chats/<uuid>.md.
+
+    This is the write-path counterpart to memory_deep_search: whatever Claude
+    learns in a session can be persisted as a first-class chat node, immediately
+    searchable and included in the topic graph.
+
+    Args:
+        title:      Short descriptive title for the conversation.
+        summary:    2-6 sentence deep summary of what was discussed.
+        key_facts:  Bullet-point list of important facts established.
+        decisions:  Bullet-point list of decisions or conclusions reached.
+        tags:       Keyword tags (used for topic graph edges + category detection).
+        keywords:   Comma-separated search keywords (for FTS boosting).
+        categories: Optional explicit category list. Auto-detected from tags if omitted.
+        chat_id:    Optional UUID. A new one is generated if omitted.
+    """
+    import uuid as _uuid
+    from datetime import date
+
+    vault = config.vault_path
+    chats_dir = vault / "chats"
+    chats_dir.mkdir(parents=True, exist_ok=True)
+
+    cid = (chat_id or str(_uuid.uuid4())).strip()
+    vault_key = f"chats.{cid}"
+    today = date.today().isoformat()
+
+    # Auto-detect categories from tags if not provided
+    if not categories:
+        categories = _categorise_summary(tags, title)
+
+    # Build frontmatter
+    tags_yaml = "\n".join(f"- {t}" for t in tags) if tags else "[]"
+    cats_yaml = "\n".join(f"- {c}" for c in categories) if categories else "- misc"
+    frontmatter = (
+        f"---\n"
+        f"key: {vault_key}\n"
+        f"type: chat_summary\n"
+        f"title: {title}\n"
+        f"created: {today}\n"
+        f"source: claude_session\n"
+        f"categories:\n{cats_yaml}\n"
+        f"tags:\n{tags_yaml}\n"
+        f"related: []\n"
+        f"---\n"
+    )
+
+    # Build body
+    sections: list[str] = [f"# {title}\n"]
+    sections.append(f"## Deep Summary\n\n{summary.strip()}\n")
+    if key_facts:
+        sections.append("## Key Facts\n\n" + "\n".join(f"- {f}" for f in key_facts) + "\n")
+    if decisions:
+        sections.append("## Decisions\n\n" + "\n".join(f"- {d}" for d in decisions) + "\n")
+    if keywords:
+        sections.append(f"## Keywords\n\n{keywords.strip()}\n")
+
+    md_path = chats_dir / f"{cid}.md"
+    md_path.write_text(frontmatter + "\n" + "\n".join(sections), encoding="utf-8")
+
+    # Update FTS5 index immediately so it's searchable right away
+    try:
+        from .index import MemoryIndex
+        from .encryption import read_text
+        idx = MemoryIndex(vault, lambda p: read_text(config, p))
+        idx.upsert_file(md_path)
+    except Exception:
+        pass
+
+    return {
+        "chat_id": cid,
+        "key": vault_key,
+        "file": str(md_path.relative_to(vault)).replace("\\", "/"),
+        "categories": categories,
+        "message": (
+            f"Saved as chats/{cid}.md. "
+            "Run memory_build_graph to wire it into the topic graph."
+        ),
+    }

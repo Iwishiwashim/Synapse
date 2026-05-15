@@ -16,6 +16,7 @@ from .functions import (
     memory_build_graph,
     memory_code_search,
     memory_code_stats,
+    memory_save_chat,
     memory_conflicts,
     memory_get_raw,
     memory_get_raw_chunks,
@@ -239,6 +240,26 @@ def code_search(query: str, project: str = "", limit: int = 8) -> list[dict]:
 def code_stats(project: str = "") -> dict:
     """Stats for code projects indexed by memory_scan_project. Pass project slug to drill in, or leave blank to list all indexed projects."""
     return memory_code_stats(config, project=project)
+
+
+@app.tool(name="memory_save_chat")
+def save_chat(
+    title: str,
+    summary: str,
+    key_facts: list[str],
+    decisions: list[str],
+    tags: list[str],
+    keywords: str = "",
+    categories: list[str] = [],
+    chat_id: str = "",
+) -> dict:
+    """Save the current conversation as a chat summary in vault/chats/. Call this at the end of any session worth remembering. The result is immediately searchable via memory_deep_search and memory_search. Run memory_build_graph afterward to wire it into the topic graph."""
+    return memory_save_chat(
+        config, title, summary, key_facts, decisions, tags,
+        keywords=keywords,
+        categories=categories or None,
+        chat_id=chat_id or None,
+    )
 
 
 def main() -> None:
