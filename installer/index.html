@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synapse Installer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0d0d0d;
+    color: #e8e8e8;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    background: #141414;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 620px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    padding: 32px 36px 24px;
+    border-bottom: 1px solid #1e1e1e;
+  }
+
+  .logo {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .logo span { color: #7c6aff; }
+
+  .tagline {
+    font-size: 13px;
+    color: #666;
+  }
+
+  /* Progress bar */
+  .progress-track {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 24px 36px 0;
+  }
+
+  .step-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #2a2a2a;
+    background: #141414;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #444;
+    flex-shrink: 0;
+    transition: all 0.3s;
+    z-index: 1;
+  }
+
+  .step-dot.active {
+    border-color: #7c6aff;
+    background: #7c6aff;
+    color: #fff;
+  }
+
+  .step-dot.done {
+    border-color: #22c55e;
+    background: #22c55e;
+    color: #fff;
+  }
+
+  .step-line {
+    flex: 1;
+    height: 2px;
+    background: #2a2a2a;
+    transition: background 0.3s;
+  }
+
+  .step-line.done { background: #22c55e; }
+
+  /* Steps */
+  .steps { padding: 28px 36px 36px; }
+
+  .step { display: none; }
+  .step.active { display: block; }
+
+  .step-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .step-desc {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  input[type="text"],
+  input[type="password"] {
+    width: 100%;
+    background: #0d0d0d;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 11px 14px;
+    font-size: 14px;
+    color: #e8e8e8;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 16px;
+    font-family: "SF Mono", "Fira Code", monospace;
+  }
+
+  input:focus { border-color: #7c6aff; }
+  input.error { border-color: #ef4444; }
+  input.success { border-color: #22c55e; }
+
+  .field-note {
+    font-size: 12px;
+    color: #555;
+    margin-top: -12px;
+    margin-bottom: 16px;
+  }
+
+  .field-note a { color: #7c6aff; text-decoration: none; }
+  .field-note a:hover { text-decoration: underline; }
+
+  /* Toggle group */
+  .toggle-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .toggle-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+    background: #0d0d0d;
+    color: #666;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .toggle-btn.selected {
+    border-color: #7c6aff;
+    background: rgba(124,106,255,0.1);
+    color: #fff;
+  }
+
+  .toggle-desc {
+    font-size: 12px;
+    color: #555;
+    margin-top: 4px;
+  }
+
+  /* Alert boxes */
+  .alert {
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+    line-height: 1.5;
+  }
+
+  .alert.show { display: block; }
+  .alert.info { background: rgba(124,106,255,0.1); border: 1px solid rgba(124,106,255,0.3); color: #a89fff; }
+  .alert.success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #86efac; }
+  .alert.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+  .alert.warning { background: rgba(234,179,8,0.1); border: 1px solid rgba(234,179,8,0.3); color: #fde047; }
+
+  /* Code block */
+  .code-block {
+    background: #0d0d0d;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: "SF Mono", "Fira Code", "Courier New", monospace;
+    font-size: 12px;
+    color: #a89fff;
+    margin-bottom: 12px;
+    position: relative;
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.7;
+  }
+
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #2a2a2a;
+    border: none;
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover { background: #333; color: #fff; }
+
+  /* Checklist */
+  .checklist { margin-bottom: 20px; }
+
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #1a1a1a;
+    font-size: 13px;
+  }
+
+  .check-item:last-child { border-bottom: none; }
+
+  .check-icon {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+  }
+
+  .check-icon.pending { background: #1e1e1e; border: 1px solid #333; }
+  .check-icon.ok { background: #22c55e; color: #fff; }
+  .check-icon.warn { background: #eab308; color: #000; }
+  .check-icon.skip { background: #333; color: #666; }
+
+  .check-text { flex: 1; }
+  .check-label { color: #ccc; font-weight: 500; }
+  .check-sub { color: #555; font-size: 12px; margin-top: 2px; }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .btn {
+    padding: 11px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: #7c6aff;
+    color: #fff;
+    flex: 1;
+  }
+
+  .btn-primary:hover { background: #6b5aee; }
+  .btn-primary:disabled { background: #2a2a2a; color: #444; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: #1e1e1e;
+    color: #888;
+    border: 1px solid #2a2a2a;
+  }
+
+  .btn-secondary:hover { background: #252525; color: #ccc; }
+
+  .btn-ghost {
+    background: transparent;
+    color: #555;
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .btn-ghost:hover { color: #888; }
+
+  /* Spinner */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  /* Platform tabs */
+  .platform-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .ptab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid #2a2a2a;
+    background: #0d0d0d;
+    color: #555;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .ptab.active {
+    border-color: #7c6aff;
+    background: rgba(124,106,255,0.1);
+    color: #a89fff;
+  }
+
+  .platform-content { display: none; }
+  .platform-content.active { display: block; }
+
+  /* Final summary */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .summary-card {
+    background: #0d0d0d;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+
+  .summary-card .sc-label { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .summary-card .sc-value { font-size: 13px; color: #ccc; font-weight: 500; word-break: break-all; }
+  .summary-card .sc-value.good { color: #22c55e; }
+  .summary-card .sc-value.skip { color: #555; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="card-header">
+    <div class="logo"><span>Synapse</span> Installer</div>
+    <div class="tagline">A memory agent for Claude — set up in 5 minutes</div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-track">
+    <div class="step-dot active" id="dot-1">1</div>
+    <div class="step-line" id="line-1"></div>
+    <div class="step-dot" id="dot-2">2</div>
+    <div class="step-line" id="line-2"></div>
+    <div class="step-dot" id="dot-3">3</div>
+    <div class="step-line" id="line-3"></div>
+    <div class="step-dot" id="dot-4">4</div>
+    <div class="step-line" id="line-4"></div>
+    <div class="step-dot" id="dot-5">5</div>
+  </div>
+
+  <div class="steps">
+
+    <!-- Step 1: Welcome + Python check -->
+    <div class="step active" id="step-1">
+      <div class="step-title">Welcome</div>
+      <div class="step-desc">Synapse gives Claude persistent memory across sessions and reduces token usage by up to 99.9%. This wizard installs everything and connects it to Claude.</div>
+
+      <div class="checklist" id="sys-checks">
+        <div class="check-item">
+          <div class="check-icon pending" id="chk-python">?</div>
+          <div class="check-text">
+            <div class="check-label">Python 3.10+</div>
+            <div class="check-sub" id="chk-python-sub">Checking...</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <div class="check-icon pending" id="chk-claude">?</div>
+          <div class="check-text">
+            <div class="check-label">Claude Desktop</div>
+            <div class="check-sub" id="chk-claude-sub">Required to use Synapse</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert info show" id="python-install-note" style="display:none">
+        Python not detected. Install it first, then re-open this page.<br><br>
+        <strong>Windows:</strong> <a href="https://www.python.org/downloads/" target="_blank">python.org/downloads</a> — check "Add to PATH"<br>
+        <strong>Mac:</strong> <code style="color:#a89fff">brew install python3</code> or <a href="https://www.python.org/downloads/" target="_blank">python.org/downloads</a>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-1-next" onclick="goTo(2)">Get started →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: API Keys -->
+    <div class="step" id="step-2">
+      <div class="step-title">API Keys</div>
+      <div class="step-desc">Synapse uses Gemini for all AI processing. The key is free — 15 requests/minute is enough for everything.</div>
+
+      <label>Gemini API Key <span style="color:#ef4444">*</span></label>
+      <input type="password" id="gemini-key" placeholder="AIza..." oninput="clearKeyStatus()">
+      <div class="field-note">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a></div>
+
+      <div class="alert" id="gemini-alert"></div>
+
+      <label>Groq API Key <span style="color:#555">(optional)</span></label>
+      <input type="text" id="groq-key" placeholder="gsk_... — leave blank to skip">
+      <div class="field-note">Only needed for the ChatGPT export filtering pipeline. <a href="https://console.groq.com" target="_blank">console.groq.com</a></div>
+
+      <label>OpenRouter API Key <span style="color:#555">(optional)</span></label>
+      <input type="text" id="openrouter-key" placeholder="sk-or-... — leave blank to skip">
+      <div class="field-note">Only needed for Diagnostics/Triage.py. <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a></div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goTo(1)">← Back</button>
+        <button class="btn btn-primary" id="btn-test-key" onclick="testGeminiKey()">Test key →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Configuration -->
+    <div class="step" id="step-3">
+      <div class="step-title">Configuration</div>
+      <div class="step-desc">Choose where your vault lives and how Claude should handle memory writes.</div>
+
+      <label>Vault Path</label>
+      <input type="text" id="vault-path" value="./vault" placeholder="./vault">
+      <div class="field-note">Where your memory files are stored. Relative to the Synapse folder.</div>
+
+      <label>Write Mode</label>
+      <div class="toggle-group">
+        <div class="toggle-btn selected" id="mode-review" onclick="selectMode('review')">
+          Review
+          <div class="toggle-desc">Claude proposes a diff — you approve before anything is written</div>
+        </div>
+        <div class="toggle-btn" id="mode-auto" onclick="selectMode('auto')">
+          Auto
+          <div class="toggle-desc">Claude writes directly, no confirmation needed</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goTo(2)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(4)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Install commands -->
+    <div class="step" id="step-4">
+      <div class="step-title">Install Synapse</div>
+      <div class="step-desc">Run these commands in your terminal from the Synapse folder. Copy each block in order.</div>
+
+      <div class="platform-tabs">
+        <div class="ptab active" onclick="setPlatform('windows')">Windows</div>
+        <div class="ptab" onclick="setPlatform('mac')">macOS / Linux</div>
+      </div>
+
+      <div class="platform-content active" id="plat-windows">
+        <div style="font-size:12px;color:#555;margin-bottom:10px;">1. Create virtual environment</div>
+        <div class="code-block">python -m venv .venv
+.venv\Scripts\activate<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+
+        <div style="font-size:12px;color:#555;margin-bottom:10px;">2. Install dependencies</div>
+        <div class="code-block">pip install -r requirements.txt<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+
+        <div style="font-size:12px;color:#555;margin-bottom:10px;">3. Write your config (generated from your inputs)</div>
+        <div class="code-block" id="win-env-cmd">GEMINI_API_KEY=your_key_here<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+
+        <div style="font-size:12px;color:#555;margin-bottom:10px;">4. Verify install</div>
+        <div class="code-block">python -m pytest Diagnostics/test_core.py -q<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+      </div>
+
+      <div class="platform-content" id="plat-mac">
+        <div style="font-size:12px;color:#555;margin-bottom:10px;">1. Create virtual environment</div>
+        <div class="code-block">python3 -m venv .venv
+source .venv/bin/activate<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+
+        <div style="font-size:12px;color:#555;margin-bottom:10px;">2. Install dependencies</div>
+        <div class="code-block">pip install -r requirements.txt<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+
+        <div style="font-size:12px;color:#555;margin-bottom:10px;">3. Write your config</div>
+        <div class="code-block" id="mac-env-cmd">echo "GEMINI_API_KEY=your_key" > .env<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+
+        <div style="font-size:12px;color:#555;margin-bottom:10px;">4. Verify install</div>
+        <div class="code-block">python3 -m pytest Diagnostics/test_core.py -q<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+      </div>
+
+      <div class="alert info show">
+        After the tests pass, come back here and click Continue to generate your Claude MCP config.
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goTo(3)">← Back</button>
+        <button class="btn btn-primary" onclick="goTo(5)">Tests passed — Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Done -->
+    <div class="step" id="step-5">
+      <div class="step-title">Connect to Claude</div>
+      <div class="step-desc">Add this to your Claude Desktop config file, then restart Claude Desktop.</div>
+
+      <div class="platform-tabs">
+        <div class="ptab active" onclick="setFinalPlatform('windows')">Windows</div>
+        <div class="ptab" onclick="setFinalPlatform('mac')">macOS</div>
+      </div>
+
+      <div style="font-size:12px;color:#555;margin:10px 0 6px;">Config file location</div>
+      <div class="platform-content active" id="final-windows">
+        <div class="code-block">%APPDATA%\Claude\claude_desktop_config.json<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+      </div>
+      <div class="platform-content" id="final-mac">
+        <div class="code-block">~/Library/Application Support/Claude/claude_desktop_config.json<button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+      </div>
+
+      <div style="font-size:12px;color:#555;margin:14px 0 6px;">Paste this into the config (merge with existing mcpServers if present)</div>
+      <div class="code-block" id="mcp-config-block" style="white-space:pre-wrap;word-break:break-all;"></div>
+
+      <div class="summary-grid" id="summary-grid"></div>
+
+      <div class="alert success show">
+        ✓ Restart Claude Desktop — Synapse will appear in the tools list. Start a conversation and say <strong>"Load my memory context"</strong>.
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goTo(4)">← Back</button>
+        <button class="btn btn-primary" onclick="copyMcpConfig()">Copy MCP config</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let currentStep = 1;
+let writeMode = 'review';
+let geminiKeyValid = false;
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+
+function goTo(n) {
+  if (n === 2 && !geminiKeyValid) {
+    // allow going back
+  }
+  document.getElementById('step-' + currentStep).classList.remove('active');
+  document.getElementById('step-' + n).classList.add('active');
+
+  // Update dots
+  for (let i = 1; i <= 5; i++) {
+    const dot = document.getElementById('dot-' + i);
+    dot.classList.remove('active', 'done');
+    if (i < n) dot.classList.add('done'), dot.textContent = '✓';
+    else if (i === n) dot.classList.add('active'), dot.textContent = i;
+    else dot.textContent = i;
+  }
+  for (let i = 1; i <= 4; i++) {
+    const line = document.getElementById('line-' + i);
+    line.classList.toggle('done', i < n);
+  }
+
+  currentStep = n;
+
+  if (n === 4) buildInstallCommands();
+  if (n === 5) buildFinalConfig();
+}
+
+// ── Step 1: System checks ───────────────────────────────────────────────────
+
+function runSystemChecks() {
+  // Python — we can't actually run shell commands from a browser,
+  // so we ask the user to confirm or show install instructions.
+  const pythonEl = document.getElementById('chk-python');
+  const pythonSub = document.getElementById('chk-python-sub');
+  const claudeEl = document.getElementById('chk-claude');
+  const claudeSub = document.getElementById('chk-claude-sub');
+
+  // Detect OS for helpful hints
+  const isWin = navigator.platform.toLowerCase().includes('win');
+  const isMac = navigator.platform.toLowerCase().includes('mac');
+
+  pythonEl.className = 'check-icon warn';
+  pythonEl.textContent = '!';
+  pythonSub.textContent = isWin
+    ? 'Open Command Prompt and run: python --version'
+    : 'Open Terminal and run: python3 --version';
+  document.getElementById('python-install-note').style.display = 'block';
+
+  claudeEl.className = 'check-icon warn';
+  claudeEl.textContent = '!';
+  claudeSub.innerHTML = 'Download at <a href="https://claude.ai/download" target="_blank" style="color:#7c6aff">claude.ai/download</a>';
+}
+
+// ── Step 2: Test Gemini key ─────────────────────────────────────────────────
+
+function clearKeyStatus() {
+  const alert = document.getElementById('gemini-alert');
+  alert.className = 'alert';
+  document.getElementById('gemini-key').classList.remove('error', 'success');
+  geminiKeyValid = false;
+}
+
+async function testGeminiKey() {
+  const key = document.getElementById('gemini-key').value.trim();
+  const alert = document.getElementById('gemini-alert');
+  const btn = document.getElementById('btn-test-key');
+  const input = document.getElementById('gemini-key');
+
+  if (!key) {
+    alert.className = 'alert error show';
+    alert.textContent = 'Please enter your Gemini API key.';
+    input.classList.add('error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Testing key...';
+  alert.className = 'alert info show';
+  alert.textContent = 'Contacting Gemini API...';
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (res.ok && data.models) {
+      alert.className = 'alert success show';
+      alert.textContent = '✓ Key is valid — ' + data.models.length + ' models available.';
+      input.classList.remove('error');
+      input.classList.add('success');
+      geminiKeyValid = true;
+      btn.innerHTML = 'Continue →';
+      btn.disabled = false;
+      btn.onclick = () => goTo(3);
+    } else {
+      const msg = data.error?.message || 'Invalid key.';
+      alert.className = 'alert error show';
+      alert.textContent = '✗ ' + msg;
+      input.classList.add('error');
+      btn.disabled = false;
+      btn.innerHTML = 'Test key →';
+      btn.onclick = testGeminiKey;
+    }
+  } catch (e) {
+    alert.className = 'alert warning show';
+    alert.innerHTML = 'Could not reach Gemini API — check your internet connection.<br><small>' + e.message + '</small>';
+    btn.disabled = false;
+    btn.innerHTML = 'Retry →';
+    btn.onclick = testGeminiKey;
+  }
+}
+
+// ── Step 3: Write mode ──────────────────────────────────────────────────────
+
+function selectMode(m) {
+  writeMode = m;
+  document.getElementById('mode-review').classList.toggle('selected', m === 'review');
+  document.getElementById('mode-auto').classList.toggle('selected', m === 'auto');
+}
+
+// ── Step 4: Build install commands ─────────────────────────────────────────
+
+function buildInstallCommands() {
+  const key = document.getElementById('gemini-key').value.trim();
+  const groq = document.getElementById('groq-key').value.trim();
+  const or = document.getElementById('openrouter-key').value.trim();
+
+  let winEnv = `echo GEMINI_API_KEY=${key} > .env`;
+  if (groq) winEnv += `\necho GROQ_API_KEY=${groq} >> .env`;
+  if (or)   winEnv += `\necho OPENROUTER_API_KEY=${or} >> .env`;
+
+  let macEnv = `echo "GEMINI_API_KEY=${key}" > .env`;
+  if (groq) macEnv += `\necho "GROQ_API_KEY=${groq}" >> .env`;
+  if (or)   macEnv += `\necho "OPENROUTER_API_KEY=${or}" >> .env`;
+
+  document.getElementById('win-env-cmd').childNodes[0].textContent = winEnv + '\n';
+  document.getElementById('mac-env-cmd').childNodes[0].textContent = macEnv + '\n';
+}
+
+function setPlatform(p) {
+  document.querySelectorAll('#step-4 .ptab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && p === 'windows') || (i === 1 && p === 'mac'));
+  });
+  document.getElementById('plat-windows').classList.toggle('active', p === 'windows');
+  document.getElementById('plat-mac').classList.toggle('active', p === 'mac');
+}
+
+// ── Step 5: Final config ────────────────────────────────────────────────────
+
+function buildFinalConfig() {
+  const key = document.getElementById('gemini-key').value.trim();
+  const groq = document.getElementById('groq-key').value.trim();
+  const vault = document.getElementById('vault-path').value.trim() || './vault';
+  const isWin = navigator.platform.toLowerCase().includes('win');
+
+  const pythonPath = isWin
+    ? 'C:\\path\\to\\Synapse\\.venv\\Scripts\\python.exe'
+    : '/path/to/Synapse/.venv/bin/python3';
+  const scriptPath = isWin
+    ? 'C:\\path\\to\\Synapse\\run_server.py'
+    : '/path/to/Synapse/run_server.py';
+
+  const env = { GEMINI_API_KEY: key };
+  if (groq) env.GROQ_API_KEY = groq;
+
+  const config = {
+    mcpServers: {
+      synapse: {
+        command: pythonPath,
+        args: [scriptPath],
+        env: env
+      }
+    }
+  };
+
+  document.getElementById('mcp-config-block').childNodes[0]
+    ? document.getElementById('mcp-config-block').innerHTML =
+        JSON.stringify(config, null, 2) +
+        '<button class="copy-btn" onclick="copyMcpConfig()">Copy</button>'
+    : null;
+
+  document.getElementById('mcp-config-block').innerHTML =
+    JSON.stringify(config, null, 2) +
+    '<button class="copy-btn" onclick="copyMcpConfig()">Copy</button>';
+
+  // Summary grid
+  const grid = document.getElementById('summary-grid');
+  grid.innerHTML = `
+    <div class="summary-card">
+      <div class="sc-label">Gemini Key</div>
+      <div class="sc-value good">✓ Verified</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Write Mode</div>
+      <div class="sc-value">${writeMode}</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Vault Path</div>
+      <div class="sc-value">${vault}</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Groq Key</div>
+      <div class="sc-value ${groq ? '' : 'skip'}">${groq ? '✓ Set' : 'Skipped'}</div>
+    </div>
+  `;
+}
+
+function setFinalPlatform(p) {
+  document.querySelectorAll('#step-5 .ptab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && p === 'windows') || (i === 1 && p === 'mac'));
+  });
+  document.getElementById('final-windows').classList.toggle('active', p === 'windows');
+  document.getElementById('final-mac').classList.toggle('active', p === 'mac');
+}
+
+function copyMcpConfig() {
+  const text = document.getElementById('mcp-config-block').innerText.replace('Copy', '').trim();
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('#step-5 .btn-primary');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = 'Copy MCP config', 2000);
+  });
+}
+
+// ── Copy helper ─────────────────────────────────────────────────────────────
+
+function copyCode(btn) {
+  const block = btn.parentElement;
+  const text = block.childNodes[0].textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+
+window.addEventListener('load', runSystemChecks);
+</script>
+</body>
+</html>
