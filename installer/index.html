@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synapse Installer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d0d0d; color: #e8e8e8; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; width: 680px; max-width: 95vw; overflow: hidden; }
+  .header { padding: 28px 32px 20px; border-bottom: 1px solid #2a2a2a; display: flex; align-items: center; gap: 14px; }
+  .logo { width: 36px; height: 36px; background: linear-gradient(135deg, #7c6ff7, #a78bfa); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+  .header p { font-size: 13px; color: #888; margin-top: 2px; }
+  .steps-bar { display: flex; padding: 0 32px; gap: 0; border-bottom: 1px solid #2a2a2a; }
+  .step-tab { flex: 1; padding: 14px 0; text-align: center; font-size: 12px; color: #555; cursor: default; border-bottom: 2px solid transparent; transition: color 0.2s; }
+  .step-tab.active { color: #a78bfa; border-bottom-color: #a78bfa; }
+  .step-tab.done { color: #4ade80; }
+  .body { padding: 32px; min-height: 300px; }
+  .step { display: none; }
+  .step.active { display: block; }
+  h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; color: #fff; }
+  .sub { font-size: 13px; color: #888; margin-bottom: 24px; line-height: 1.5; }
+  .cmd-block { background: #0a0a0a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 16px 18px; font-family: "Cascadia Code", "Fira Code", monospace; font-size: 13px; color: #c9d1d9; position: relative; margin-bottom: 16px; white-space: pre-wrap; line-height: 1.7; }
+  .copy-btn { position: absolute; top: 10px; right: 10px; background: #2a2a2a; border: none; color: #aaa; border-radius: 5px; padding: 4px 10px; font-size: 11px; cursor: pointer; transition: background 0.15s; }
+  .copy-btn:hover { background: #3a3a3a; color: #fff; }
+  .copy-btn.copied { background: #1a3a2a; color: #4ade80; }
+  .note { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 8px; padding: 14px 16px; font-size: 13px; color: #a0a8d0; margin-bottom: 16px; line-height: 1.6; }
+  .note a { color: #a78bfa; text-decoration: none; }
+  .note a:hover { text-decoration: underline; }
+  .key-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+  .key-table th { text-align: left; color: #666; font-weight: 500; padding: 6px 0; border-bottom: 1px solid #222; }
+  .key-table td { padding: 10px 0; border-bottom: 1px solid #1e1e1e; vertical-align: top; }
+  .key-table td:first-child { color: #c9d1d9; font-family: monospace; width: 200px; }
+  .key-table td a { color: #a78bfa; text-decoration: none; font-size: 12px; }
+  .key-table td a:hover { text-decoration: underline; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 6px; }
+  .badge.required { background: #3a1a1a; color: #f87171; }
+  .badge.optional { background: #1a2a1a; color: #4ade80; }
+  .footer { display: flex; justify-content: space-between; align-items: center; padding: 20px 32px; border-top: 1px solid #2a2a2a; }
+  .btn { padding: 10px 24px; border-radius: 7px; font-size: 14px; font-weight: 500; border: none; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #7c6ff7; color: #fff; }
+  .btn-primary:hover { background: #9183f8; }
+  .btn-secondary { background: transparent; color: #888; border: 1px solid #333; }
+  .btn-secondary:hover { border-color: #555; color: #ccc; }
+  .progress { font-size: 12px; color: #555; }
+  .check-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+  .check-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: #ccc; line-height: 1.5; }
+  .check-list li::before { content: "✓"; color: #4ade80; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .final-msg { text-align: center; padding: 16px 0 8px; }
+  .final-msg .big { font-size: 40px; margin-bottom: 12px; }
+  .final-msg h2 { font-size: 22px; margin-bottom: 8px; }
+  .final-msg p { color: #888; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="logo">⚡</div>
+    <div>
+      <h1>Synapse Installer</h1>
+      <p>Memory agent for Claude — follow the steps below</p>
+    </div>
+  </div>
+
+  <div class="steps-bar">
+    <div class="step-tab active" id="tab-1">1. Requirements</div>
+    <div class="step-tab" id="tab-2">2. API Keys</div>
+    <div class="step-tab" id="tab-3">3. Install</div>
+    <div class="step-tab" id="tab-4">4. Configure</div>
+    <div class="step-tab" id="tab-5">5. Done</div>
+  </div>
+
+  <div class="body">
+
+    <!-- Step 1 -->
+    <div class="step active" id="step-1">
+      <h2>Requirements</h2>
+      <p class="sub">Synapse needs Python 3.10+ and Git. Install them if you haven't already.</p>
+
+      <div class="note">
+        <strong>Python 3.10+</strong> — <a href="https://python.org/downloads" target="_blank">python.org/downloads</a><br>
+        Tick <em>"Add Python to PATH"</em> during install on Windows.
+      </div>
+      <div class="note">
+        <strong>Git</strong> — <a href="https://git-scm.com/downloads" target="_blank">git-scm.com/downloads</a><br>
+        Needed to clone the repo and for Synapse's auto-commit feature.
+      </div>
+
+      <p style="font-size:13px;color:#888;margin-bottom:8px;">Verify in a terminal:</p>
+      <div class="cmd-block">python --version
+git --version<button class="copy-btn" onclick="copy(this, 'python --version\ngit --version')">Copy</button></div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step" id="step-2">
+      <h2>API Keys</h2>
+      <p class="sub">Synapse uses Gemini for embeddings and search. Only the Gemini key is required for daily use.</p>
+
+      <table class="key-table">
+        <thead><tr><th>Key</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>GEMINI_API_KEY <span class="badge required">required</span></td>
+            <td>Everything — embeddings, search, import<br><a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> (free)</td>
+          </tr>
+          <tr>
+            <td>GROQ_API_KEY <span class="badge optional">optional</span></td>
+            <td>Bulk export filtering only<br><a href="https://console.groq.com" target="_blank">console.groq.com</a> (free tier)</td>
+          </tr>
+          <tr>
+            <td>OPENROUTER_API_KEY <span class="badge optional">optional</span></td>
+            <td>Bulk export filtering only<br><a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> (free tier)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:13px;color:#888;margin-bottom:8px;">Add keys to a <code style="font-size:12px;color:#c9d1d9;">.env</code> file in the Synapse folder:</p>
+      <div class="cmd-block">GEMINI_API_KEY=your_key_here
+GROQ_API_KEY=your_key_here
+OPENROUTER_API_KEY=your_key_here<button class="copy-btn" onclick="copy(this, 'GEMINI_API_KEY=your_key_here\nGROQ_API_KEY=your_key_here\nOPENROUTER_API_KEY=your_key_here')">Copy</button></div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step" id="step-3">
+      <h2>Install</h2>
+      <p class="sub">Clone the repo, create a virtual environment, and install dependencies.</p>
+
+      <p style="font-size:13px;color:#888;margin-bottom:8px;">Windows (PowerShell):</p>
+      <div class="cmd-block">git clone https://github.com/Santhosh-Stalin/Synapse.git
+cd Synapse
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt<button class="copy-btn" onclick="copy(this, 'git clone https://github.com/Santhosh-Stalin/Synapse.git\ncd Synapse\npython -m venv .venv\n.venv\\Scripts\\activate\npip install -r requirements.txt')">Copy</button></div>
+
+      <p style="font-size:13px;color:#888;margin-bottom:8px;">macOS / Linux:</p>
+      <div class="cmd-block">git clone https://github.com/Santhosh-Stalin/Synapse.git
+cd Synapse
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt<button class="copy-btn" onclick="copy(this, 'git clone https://github.com/Santhosh-Stalin/Synapse.git\ncd Synapse\npython -m venv .venv\nsource .venv/bin/activate\npip install -r requirements.txt')">Copy</button></div>
+
+      <p style="font-size:13px;color:#888;margin-bottom:8px;">Verify the install:</p>
+      <div class="cmd-block">python -m pytest Diagnostics/test_core.py -v<button class="copy-btn" onclick="copy(this, 'python -m pytest Diagnostics/test_core.py -v')">Copy</button></div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step" id="step-4">
+      <h2>Configure</h2>
+      <p class="sub">Run setup to set your API key, vault path, write mode, and register Synapse with Claude Desktop and Claude Code.</p>
+
+      <div class="cmd-block">python setup.py<button class="copy-btn" onclick="copy(this, 'python setup.py')">Copy</button></div>
+
+      <p style="font-size:13px;color:#888;margin-bottom:8px;">What setup.py does:</p>
+      <ul class="check-list">
+        <li>Reads your Gemini API key from <code style="font-size:12px;">.env</code> or prompts for it</li>
+        <li>Sets vault path (default: <code style="font-size:12px;">./vault</code>)</li>
+        <li>Asks for write mode — <strong>review</strong> (you approve each write) or <strong>auto</strong> (Claude writes directly)</li>
+        <li>Writes <code style="font-size:12px;">config.yaml</code></li>
+        <li>Updates Claude Desktop MCP config at <code style="font-size:12px;">~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+        <li>Updates Claude Code MCP config</li>
+      </ul>
+
+      <div class="note">After setup, <strong>restart Claude Desktop</strong>. Synapse appears in the tools list automatically.</div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step" id="step-5">
+      <div class="final-msg">
+        <div class="big">⚡</div>
+        <h2>You're all set</h2>
+        <p style="margin-bottom:24px;">Open Claude Desktop or Claude Code and say:<br><strong style="color:#a78bfa;">"Load my memory context"</strong></p>
+      </div>
+      <ul class="check-list">
+        <li>Python installed and on PATH</li>
+        <li>API keys saved to <code style="font-size:12px;">.env</code></li>
+        <li>Dependencies installed in <code style="font-size:12px;">.venv</code></li>
+        <li>All 37 tests passing</li>
+        <li>MCP config written — Claude can see Synapse tools</li>
+      </ul>
+      <div class="note">
+        Import past conversations: <code style="font-size:12px;">memory_import_ai_export("/path/to/export")</code><br>
+        Docs: <a href="https://github.com/Santhosh-Stalin/Synapse" target="_blank">github.com/Santhosh-Stalin/Synapse</a>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button class="btn btn-secondary" id="btn-back" onclick="go(-1)" style="visibility:hidden">Back</button>
+    <span class="progress" id="progress">Step 1 of 5</span>
+    <button class="btn btn-primary" id="btn-next" onclick="go(1)">Next →</button>
+  </div>
+</div>
+
+<script>
+  let current = 1;
+  const total = 5;
+
+  function go(dir) {
+    const next = current + dir;
+    if (next < 1 || next > total) return;
+    document.getElementById('step-' + current).classList.remove('active');
+    document.getElementById('tab-' + current).classList.remove('active');
+    if (dir > 0) document.getElementById('tab-' + current).classList.add('done');
+    else document.getElementById('tab-' + current).classList.remove('done');
+    current = next;
+    document.getElementById('step-' + current).classList.add('active');
+    document.getElementById('tab-' + current).classList.add('active');
+    document.getElementById('progress').textContent = 'Step ' + current + ' of ' + total;
+    document.getElementById('btn-back').style.visibility = current > 1 ? 'visible' : 'hidden';
+    const nextBtn = document.getElementById('btn-next');
+    nextBtn.textContent = current === total ? '✓ Finish' : 'Next →';
+    if (current === total) nextBtn.onclick = () => window.close();
+    else nextBtn.onclick = () => go(1);
+  }
+
+  function copy(btn, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    });
+  }
+</script>
+</body>
+</html>
