@@ -15,12 +15,36 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
-ROOT = Path(__file__).resolve().parent.parent
+# When frozen by PyInstaller, __file__ is inside the temp _MEIPASS bundle.
+# ROOT is the folder containing the .exe (or the repo root when run as script).
+if getattr(sys, "frozen", False):
+    ROOT = Path(sys.executable).resolve().parent
+else:
+    ROOT = Path(__file__).resolve().parent.parent
+
 VENV = ROOT / ".venv"
 PYTHON = (
     VENV / ("Scripts" if platform.system() == "Windows" else "bin") / "python"
 )
 PIP = VENV / ("Scripts" if platform.system() == "Windows" else "bin") / "pip"
+
+
+def _find_system_python() -> str:
+    """Return the path to a real Python interpreter (not this .exe if frozen)."""
+    import shutil
+    if not getattr(sys, "frozen", False):
+        return sys.executable
+    # Search PATH for python / python3
+    for name in ("python", "python3", "python3.12", "python3.11", "python3.10"):
+        found = shutil.which(name)
+        if found:
+            try:
+                r = subprocess.run([found, "--version"], capture_output=True, text=True, timeout=5)
+                if r.returncode == 0 and "Python 3" in r.stdout + r.stderr:
+                    return found
+            except Exception:
+                continue
+    return ""
 
 BG = "#0d0d0d"
 CARD = "#161616"
@@ -445,15 +469,19 @@ class StepInstall(Step):
                 shutil.rmtree(VENV)
             except Exception as e:
                 return False, f"Could not remove existing .venv: {e}"
-        return self._run_cmd([sys.executable, "-m", "venv", str(VENV)])
+        py = _find_system_python()
+        if not py:
+            return False, "Python not found on PATH. Install Python 3.10+ and retry."
+        return self._run_cmd([py, "-m", "venv", str(VENV)])
 
     def _pip_install(self):
         # Use the launching Python + --prefix to avoid executing the venv's
         # python.exe, which Windows Defender may block on first use.
         env = os.environ.copy()
         env["PIP_REQUIRE_VIRTUALENV"] = "0"
+        py = _find_system_python()
         return self._run_cmd(
-            [sys.executable, "-m", "pip", "install", "--prefer-binary",
+            [py, "-m", "pip", "install", "--prefer-binary",
              "--prefix", str(VENV), "-r", "requirements.txt", "pytest"],
             env=env,
         )
@@ -484,13 +512,13 @@ class StepInstall(Step):
         env = os.environ.copy()
         env["PYTHONPATH"] = str(self._venv_site_packages())
         ok, out = self._run_cmd(
-            [sys.executable, "-m", "pytest", "Diagnostics/test_core.py", "-v"], env=env
+            [_find_system_python(), "-m", "pytest", "Diagnostics/test_core.py", "-v"], env=env
         )
         return True, out  # don't fail install on test failures — just report
 
     def _write_mcp(self):
         # Use sys.executable (the Python that runs the wizard / the venv we installed into)
-        python_path = str(PYTHON) if PYTHON.exists() else sys.executable
+        python_path = str(PYTHON) if PYTHON.exists() else _find_system_python()
         server_path = str(ROOT / "server" / "main.py")
         entry_cfg = {"command": python_path, "args": [server_path]}
 
