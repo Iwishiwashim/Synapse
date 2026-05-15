@@ -37,16 +37,6 @@ The last row is the point. A chat archive of 1,997 conversations is 1.37M tokens
 
 ## Quickstart in 5 minutes
 
-**Option A — GUI installer (recommended for new users)**
-
-Double-click `install.bat` (Windows) or run:
-```bash
-python installer/setup_wizard.py
-```
-The wizard checks Python, tests your Gemini API key, creates a venv, installs dependencies, runs tests, and writes the Claude Desktop / Claude Code MCP config — all in one window.
-
-**Option B — command line**
-
 ```bash
 # 1. Clone and install
 git clone https://github.com/Santhosh-Stalin/Synapse.git
