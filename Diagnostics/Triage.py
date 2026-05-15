@@ -84,7 +84,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
 # Primary OpenRouter model.
-OPENROUTER_MODEL = "mistralai/mistral-small-3.2-24b-instruct"
+OPENROUTER_MODEL = "inclusionai/ring-2.6-1t:free"
 
 # Groq fallback model.
 GROQ_MODEL = "llama-3.1-8b-instant"
