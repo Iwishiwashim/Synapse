@@ -43,7 +43,7 @@ class Wizard(tk.Tk):
         self.title("Synapse Installer")
         self.configure(bg=BG)
         self.resizable(False, False)
-        self.geometry("660x520")
+        self.geometry("660x620")
 
         self.step = 0
         self.steps = [
