@@ -1,0 +1,36 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Secrets
+.env
+
+# Vault — personal memory data (each user has their own)
+vault/
+
+# Import pipeline output — personal conversation data
+synapse_ai_summaries/
+synapse_extracted/
+synapse_filtered_chats/
+groq_blacklist_output/
+monthly_chatgpt_logs/
+
+# Logs and scratch files
+*.log
+Untitled*.txt
+
+# Obsidian / editor artifacts
+.claude/
+*.canvas
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
