@@ -6,8 +6,9 @@ __pycache__/
 dist/
 build/
 
-# Secrets
+# Secrets and personal config
 .env
+config.yaml
 
 # Vault — personal memory data (each user has their own)
 vault/
