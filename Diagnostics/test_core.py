@@ -371,3 +371,113 @@ def test_deep_search_returns_results_with_graph():
         cfg = _make_config(vault)
         result = memory_deep_search(cfg, "missing query")
         assert isinstance(result, list)
+
+
+# ---------------------------------------------------------------------------
+# memory_auto — escalation logic
+# ---------------------------------------------------------------------------
+
+def test_auto_escalates_when_no_vault_hits():
+    """Empty vault → no search results → deep_results key present (graph error is acceptable)."""
+    from server.functions import memory_auto
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        (vault / "metadata").mkdir()
+        cfg = _make_config(vault)
+        result = memory_auto(cfg, "some obscure query")
+        assert "vault_results" in result
+        assert "deep_results" in result
+
+
+def test_auto_no_escalate_when_confident(monkeypatch):
+    """When vault search returns a high-confidence hit, deep search must NOT be called."""
+    from server import functions as fn
+
+    confident_hit = [{"key": "work.stack", "score": 0.9, "reason": "direct match"}]
+    monkeypatch.setattr(fn, "memory_search_tool", lambda *_: confident_hit)
+    monkeypatch.setattr(fn, "memory_context", lambda *_: {})
+    monkeypatch.setattr(fn, "_deep_search", lambda *_: (_ for _ in ()).throw(AssertionError("deep_search must not be called")))
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        cfg = _make_config(vault)
+        result = fn.memory_auto(cfg, "what is my stack")
+
+    assert "deep_results" not in result
+    assert result["vault_results"] == confident_hit
+
+
+def test_auto_escalates_when_score_below_threshold(monkeypatch):
+    """Vault returns results but all scores are weak → deep search fires."""
+    from server import functions as fn
+
+    weak_hits = [{"key": "work.stack", "score": 0.4, "reason": "weak"}]
+    deep_called = []
+
+    def fake_deep(*_):
+        deep_called.append(True)
+        return []
+
+    monkeypatch.setattr(fn, "memory_search_tool", lambda *_: weak_hits)
+    monkeypatch.setattr(fn, "memory_context", lambda *_: {})
+    monkeypatch.setattr(fn, "_deep_search", fake_deep)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        cfg = _make_config(vault)
+        result = fn.memory_auto(cfg, "fuzzy query")
+
+    assert deep_called, "deep_search should have been called"
+    assert "deep_results" in result
+
+
+# ---------------------------------------------------------------------------
+# memory_commit — write_mode behaviour
+# ---------------------------------------------------------------------------
+
+def _make_config_with_mode(vault: Path, mode: str):
+    from server.config import SynapseConfig
+    return SynapseConfig(root_path=vault.parent, vault_path=vault, write_mode=mode)
+
+
+def test_commit_review_mode_leaves_patch_pending():
+    """In review mode, memory_commit proposes but does not apply — patch_id in response, file not written."""
+    from server.functions import memory_commit
+    with tempfile.TemporaryDirectory() as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        cfg = _make_config_with_mode(vault, "review")
+        result = memory_commit(cfg, {
+            "key": "work.testkey",
+            "content": "test content",
+            "type": "note",
+            "scope": "global",
+            "weight": 0.5,
+            "reason": "unit test",
+        })
+        assert "patch_id" in result
+        assert "diff" in result
+        # File must NOT exist yet — only proposed, not applied
+        assert not (vault / "work" / "testkey.md").exists()
+
+
+def test_commit_auto_mode_writes_file():
+    """In auto mode, memory_commit applies immediately — file must exist after the call."""
+    from server.functions import memory_commit
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
+        vault = Path(tmpdir) / "vault"
+        vault.mkdir()
+        cfg = _make_config_with_mode(vault, "auto")
+        result = memory_commit(cfg, {
+            "key": "work.autokey",
+            "content": "auto written content",
+            "type": "note",
+            "scope": "global",
+            "weight": 0.5,
+            "reason": "unit test",
+        })
+        assert result.get("status") == "applied"
+        assert (vault / "work" / "autokey.md").exists()

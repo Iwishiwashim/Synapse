@@ -354,20 +354,23 @@ def memory_deep_search(config: SynapseConfig, query: str, depth: int = 2, top_k:
 def memory_auto(config: SynapseConfig, task: str) -> dict[str, Any]:
     """
     Smart retrieval dispatcher. Always loads context, searches active vault,
-    and escalates to deep search automatically when vault results are thin.
-    Claude calls this instead of manually chaining context → search → deep_search.
+    and escalates to deep search only when no vault result clears the confidence
+    threshold (score >= 0.7). One strong hit stops the chain; weak hits escalate.
     """
+    from .search import CLAUDE_ANALYSIS_THRESHOLD
+
     result: dict[str, Any] = {}
 
     # Tier 1: always
     result["context"] = memory_context(config)
 
-    # Tier 2: active vault FTS
+    # Tier 2: active vault search
     vault_hits = memory_search_tool(config, task)
     result["vault_results"] = vault_hits
 
-    # Tier 3: escalate if vault has fewer than 2 hits
-    if len(vault_hits) < 2:
+    # Tier 3: escalate only when no hit is confident enough
+    best_score = max((r.get("score", 0.0) for r in vault_hits), default=0.0)
+    if best_score < CLAUDE_ANALYSIS_THRESHOLD:
         result["deep_results"] = _deep_search(config, task)
 
     return result
