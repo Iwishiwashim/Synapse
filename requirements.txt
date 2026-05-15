@@ -1,0 +1,11 @@
+mcp
+gitpython
+cryptography
+pyyaml
+rich
+watchdog
+typer
+google-genai
+ijson
+groq
+cerebras-cloud-sdk
