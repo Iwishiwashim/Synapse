@@ -23,6 +23,8 @@ The last row is the point. A chat archive of 1,997 conversations is 1.37M tokens
 
 ---
 
+![Synapse vault graph — 1,997 conversations indexed and linked by topic](Graph.png)
+
 ## What it is
 
 - **Memory agent** — Claude remembers across sessions, projects, and conversations
