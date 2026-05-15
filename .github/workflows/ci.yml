@@ -19,7 +19,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install --prefer-binary -r requirements.txt
+        run: pip install --prefer-binary -r requirements.txt pytest
 
       - name: Run tests
         run: python -m pytest Diagnostics/test_core.py -v
