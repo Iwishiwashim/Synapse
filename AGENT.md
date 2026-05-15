@@ -151,6 +151,18 @@ Each active vault file has YAML frontmatter (`key`, `type`, `triggers`, `related
 
 ---
 
+## Token tracking
+
+Every dict-returning tool includes a `_tokens` field — the estimated token cost of that response. Track a running session total and adjust retrieval depth accordingly:
+
+- Under 3,000 tokens: full Tier 3 is fine
+- 3,000–9,000 tokens: prefer Tier 2, use `memory_get_raw_chunks` not `memory_get_raw`
+- Over 9,000 tokens: Tier 1 only, no further retrieval unless the user explicitly asks
+
+Never exceed 15,000 tokens on memory retrieval alone in a single session.
+
+---
+
 ## Token cost reference (live system)
 
 | Call | Measured tokens |

@@ -19,6 +19,15 @@ from .scanner import scan_and_extract
 from .search import memory_search
 
 
+def _estimate_tokens(obj: Any) -> int:
+    """Rough token estimate: 1 token ≈ 4 characters of JSON-serialised text."""
+    try:
+        import json as _json
+        return max(1, len(_json.dumps(obj, ensure_ascii=False)) // 4)
+    except Exception:
+        return 0
+
+
 def memory_tree(config: SynapseConfig) -> dict[str, Any]:
     """Return a nested JSON directory tree for the configured vault."""
     vault = config.vault_path
@@ -37,12 +46,14 @@ def memory_get(config: SynapseConfig, key: str) -> dict[str, Any]:
         raise ValueError(f"Memory key does not resolve to a Markdown file: {key}")
 
     frontmatter, content = parse_memory_text(read_text(config, file_path))
-    return {
+    result = {
         "key": frontmatter.get("key", key),
         "file_path": str(file_path.relative_to(vault)).replace("\\", "/"),
         "frontmatter": frontmatter,
         "content": content,
     }
+    result["_tokens"] = _estimate_tokens(result)
+    return result
 
 
 def memory_search_tool(config: SynapseConfig, query: str) -> list[dict[str, Any]]:
@@ -275,6 +286,7 @@ def memory_context(config: SynapseConfig) -> dict[str, Any]:
         pass
 
     result["_write_mode"] = config.write_mode
+    result["_tokens"] = _estimate_tokens(result)
     return result
 
 
@@ -283,7 +295,10 @@ def memory_get_raw(config: SynapseConfig, chat_id: str) -> dict[str, Any]:
 
 
 def memory_get_raw_chunks(config: SynapseConfig, chat_id: str, query: str, top_k: int = 3, window: int = 8) -> dict[str, Any]:
-    return _get_raw_chunks(config, chat_id, query, top_k=top_k, window=window)
+    result = _get_raw_chunks(config, chat_id, query, top_k=top_k, window=window)
+    if isinstance(result, dict):
+        result["_tokens"] = _estimate_tokens(result)
+    return result
 
 
 def memory_search_raw(config: SynapseConfig, query: str, top_k: int = 10) -> list[dict[str, Any]]:
@@ -373,6 +388,7 @@ def memory_auto(config: SynapseConfig, task: str) -> dict[str, Any]:
     if best_score < CLAUDE_ANALYSIS_THRESHOLD:
         result["deep_results"] = _deep_search(config, task)
 
+    result["_tokens"] = _estimate_tokens(result)
     return result
 
 
